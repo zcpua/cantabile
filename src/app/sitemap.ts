@@ -5,6 +5,8 @@ import { site } from "@/data/site";
 import { works } from "@/data/works";
 import { articlePath, composerPath, routes, workPath } from "@/lib/routes";
 
+export const dynamic = "force-static";
+
 export default function sitemap(): MetadataRoute.Sitemap {
   const now = new Date();
   const staticRoutes = [routes.home, routes.composers, routes.works, routes.performances, routes.articles, routes.about].map((path) => ({
