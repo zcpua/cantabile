@@ -41,3 +41,8 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+.agents/skills/supabase/CHANGELOG.md
+.agents/skills/supabase/SKILL.md
+.agents/skills/supabase/assets/feedback-issue-template.md
+.agents/skills/supabase/references/skill-feedback.md
+skills-lock.json

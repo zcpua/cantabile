@@ -10,3 +10,9 @@ binding = "ASSETS"
 [[services]]
 binding = "WORKER_SELF_REFERENCE"
 service = "cantabile"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "cantabile"
+database_id = "replace-with-cloudflare-d1-database-id"
+migrations_dir = "drizzle/d1"

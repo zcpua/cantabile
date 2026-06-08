@@ -1,10 +1,12 @@
 import type { MetadataRoute } from "next";
+import { connection } from "next/server";
 import { site } from "@/data/site";
 import { locales } from "@/i18n/config";
 import { aboutPath, articlePath, articlesPath, composerPath, composersPath, homePath, performancesPath, rootPath, workPath, worksPath } from "@/i18n/routes";
 import { getSitemapData } from "@/lib/data";
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
+  await connection();
   const { composers, works, articles } = await getSitemapData();
   const now = new Date();
   const rootRoute = {
