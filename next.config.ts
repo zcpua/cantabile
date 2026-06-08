@@ -1,13 +1,8 @@
+import { initOpenNextCloudflareForDev } from "@opennextjs/cloudflare";
 import type { NextConfig } from "next";
 
-const isCloudflareExport = process.env.CLOUDFLARE_EXPORT === "1";
+initOpenNextCloudflareForDev();
 
-const nextConfig: NextConfig = {
-  ...(isCloudflareExport
-    ? {
-        output: "export" as const,
-      }
-    : {}),
-};
+const nextConfig: NextConfig = {};
 
 export default nextConfig;

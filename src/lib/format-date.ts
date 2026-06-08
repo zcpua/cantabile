@@ -1,9 +1,11 @@
-export function formatYearRange(birthYear: number, deathYear?: number) {
-  return `${birthYear}–${deathYear ?? "至今"}`;
+import { defaultLocale, type Locale } from "@/i18n/config";
+
+export function formatYearRange(birthYear: number, deathYear?: number, presentLabel = "至今") {
+  return `${birthYear}–${deathYear ?? presentLabel}`;
 }
 
-export function formatPerformanceDate(startsAt: string) {
-  return new Intl.DateTimeFormat("zh-CN", {
+export function formatPerformanceDate(startsAt: string, locale: Locale = defaultLocale) {
+  return new Intl.DateTimeFormat(locale, {
     month: "long",
     day: "numeric",
     weekday: "short",
@@ -12,8 +14,8 @@ export function formatPerformanceDate(startsAt: string) {
   }).format(new Date(startsAt));
 }
 
-export function formatArticleDate(publishedAt: string) {
-  return new Intl.DateTimeFormat("zh-CN", {
+export function formatArticleDate(publishedAt: string, locale: Locale = defaultLocale) {
+  return new Intl.DateTimeFormat(locale, {
     year: "numeric",
     month: "long",
     day: "numeric",

@@ -1,41 +1,48 @@
 import type { MetadataRoute } from "next";
-import { articles } from "@/data/articles";
-import { composers } from "@/data/composers";
 import { site } from "@/data/site";
-import { works } from "@/data/works";
-import { articlePath, composerPath, routes, workPath } from "@/lib/routes";
+import { locales } from "@/i18n/config";
+import { aboutPath, articlePath, articlesPath, composerPath, composersPath, homePath, performancesPath, rootPath, workPath, worksPath } from "@/i18n/routes";
+import { getSitemapData } from "@/lib/data";
 
-export const dynamic = "force-static";
-
-export default function sitemap(): MetadataRoute.Sitemap {
+export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
+  const { composers, works, articles } = await getSitemapData();
   const now = new Date();
-  const staticRoutes = [routes.home, routes.composers, routes.works, routes.performances, routes.articles, routes.about].map((path) => ({
-    url: new URL(path, site.url).toString(),
+  const rootRoute = {
+    url: new URL(rootPath(), site.url).toString(),
     lastModified: now,
     changeFrequency: "weekly" as const,
-    priority: path === routes.home ? 1 : 0.8,
-  }));
+    priority: 1,
+  };
 
-  const composerRoutes = composers.map((composer) => ({
-    url: new URL(composerPath(composer.slug), site.url).toString(),
+  const staticRoutes = locales.flatMap((locale) =>
+    [homePath(locale), composersPath(locale), worksPath(locale), performancesPath(locale), articlesPath(locale), aboutPath(locale)].map((path) => ({
+      url: new URL(path, site.url).toString(),
+      lastModified: now,
+      changeFrequency: "weekly" as const,
+      priority: path === homePath(locale) ? 0.95 : 0.8,
+    })),
+  );
+
+  const composerRoutes = locales.flatMap((locale) => composers.map((composer) => ({
+    url: new URL(composerPath(locale, composer.slug), site.url).toString(),
     lastModified: now,
     changeFrequency: "monthly" as const,
     priority: 0.7,
-  }));
+  })));
 
-  const workRoutes = works.map((work) => ({
-    url: new URL(workPath(work.slug), site.url).toString(),
+  const workRoutes = locales.flatMap((locale) => works.map((work) => ({
+    url: new URL(workPath(locale, work.slug), site.url).toString(),
     lastModified: now,
     changeFrequency: "monthly" as const,
     priority: 0.65,
-  }));
+  })));
 
-  const articleRoutes = articles.map((article) => ({
-    url: new URL(articlePath(article.slug), site.url).toString(),
+  const articleRoutes = locales.flatMap((locale) => articles.map((article) => ({
+    url: new URL(articlePath(locale, article.slug), site.url).toString(),
     lastModified: new Date(article.publishedAt),
     changeFrequency: "monthly" as const,
     priority: 0.6,
-  }));
+  })));
 
-  return [...staticRoutes, ...composerRoutes, ...workRoutes, ...articleRoutes];
+  return [rootRoute, ...staticRoutes, ...composerRoutes, ...workRoutes, ...articleRoutes];
 }

@@ -1,11 +1,15 @@
 import Link from "next/link";
 import type { Composer, Work } from "@/data/types";
+import type { Locale } from "@/i18n/config";
+import { workPath as localizedWorkPath } from "@/i18n/routes";
 import { workPath } from "@/lib/routes";
 import { Card } from "./card";
 
-export function WorkCard({ work, composer }: { work: Work; composer?: Composer }) {
+export function WorkCard({ work, composer, locale }: { work: Work; composer?: Composer; locale?: Locale }) {
+  const href = locale ? localizedWorkPath(locale, work.slug) : workPath(work.slug);
+
   return (
-    <Link href={workPath(work.slug)} className="group block h-full focus:outline-none">
+    <Link href={href} className="group block h-full focus:outline-none">
       <Card className="flex h-full flex-col group-focus-visible:ring-2 group-focus-visible:ring-burgundy">
         <div className="mb-4 flex flex-wrap gap-2 text-xs text-muted">
           <span className="rounded-full bg-burgundy/10 px-3 py-1 text-burgundy">{work.genre}</span>

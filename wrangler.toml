@@ -1,9 +1,12 @@
 name = "cantabile"
+main = ".open-next/worker.js"
 compatibility_date = "2026-06-08"
+compatibility_flags = ["nodejs_compat", "global_fetch_strictly_public"]
 
 [assets]
-directory = "./out"
-not_found_handling = "404-page"
+directory = ".open-next/assets"
+binding = "ASSETS"
 
-[vars]
-CLOUDFLARE_EXPORT = "1"
+[[services]]
+binding = "WORKER_SELF_REFERENCE"
+service = "cantabile"

@@ -1,21 +1,17 @@
+export const dynamic = "force-dynamic";
+
 import type { Metadata } from "next";
-import { ComposerDirectory } from "@/components/composer-directory";
-import { PageShell } from "@/components/page-shell";
-import { composers } from "@/data/composers";
-import { getComposerWorkCount } from "@/lib/data";
-import { uniqueComposerPeriods, uniqueCountries } from "@/lib/filters";
+import { ComposersPageContent } from "@/app/_localized/directory-pages";
+import { defaultLocale } from "@/i18n/config";
+import { getDictionary } from "@/i18n/dictionaries";
+
+const dictionary = getDictionary(defaultLocale);
 
 export const metadata: Metadata = {
-  title: "作曲家",
-  description: "浏览古典音乐作曲家，按时期、国家和关键词探索代表作品。",
+  title: dictionary.pages.composers.title,
+  description: dictionary.pages.composers.meta,
 };
 
-export default function ComposersPage() {
-  const workCounts = Object.fromEntries(composers.map((composer) => [composer.id, getComposerWorkCount(composer.id)]));
-
-  return (
-    <PageShell eyebrow="Composer Directory" title="作曲家" description="按音乐时期、国家和关键词筛选，快速找到你想认识的作曲家。">
-      <ComposerDirectory composers={composers} workCounts={workCounts} periods={uniqueComposerPeriods(composers)} countries={uniqueCountries(composers)} />
-    </PageShell>
-  );
+export default async function ComposersPage() {
+  return <ComposersPageContent locale={defaultLocale} />;
 }

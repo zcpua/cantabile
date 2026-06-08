@@ -1,8 +1,11 @@
 import type { Metadata } from "next";
 import { Noto_Sans_SC, Noto_Serif_SC } from "next/font/google";
-import { site } from "@/data/site";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
+import { site } from "@/data/site";
+import { defaultLocale, ogLocale } from "@/i18n/config";
+import { getDictionary } from "@/i18n/dictionaries";
+import { homePath, localeAlternates } from "@/i18n/routes";
 import "./globals.css";
 
 const sans = Noto_Sans_SC({
@@ -19,20 +22,26 @@ const serif = Noto_Serif_SC({
   display: "swap",
 });
 
+const dictionary = getDictionary(defaultLocale);
+
 export const metadata: Metadata = {
   metadataBase: new URL(site.url),
   title: {
-    default: `${site.name} - 作曲家、作品与近期演出`,
-    template: `%s | ${site.name}`,
+    default: `${dictionary.site.name} - ${dictionary.pages.composers.title}、${dictionary.pages.works.title}与${dictionary.pages.performances.title}`,
+    template: `%s | ${dictionary.site.name}`,
   },
-  description: site.description,
+  description: dictionary.site.description,
+  alternates: {
+    canonical: "/",
+    languages: localeAlternates(homePath),
+  },
   openGraph: {
-    title: `${site.name} - 作曲家、作品与近期演出`,
-    description: site.description,
+    title: `${dictionary.site.name} - ${dictionary.pages.composers.title}、${dictionary.pages.works.title}与${dictionary.pages.performances.title}`,
+    description: dictionary.site.description,
     url: site.url,
-    siteName: site.name,
+    siteName: dictionary.site.name,
     type: "website",
-    locale: "zh_CN",
+    locale: ogLocale(defaultLocale),
   },
 };
 

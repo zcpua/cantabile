@@ -2,6 +2,8 @@
 
 import { useMemo, useState } from "react";
 import type { Composer, Performance } from "@/data/types";
+import { defaultLocale, type Locale } from "@/i18n/config";
+import { getDictionary, type Dictionary } from "@/i18n/dictionaries";
 import { matchesQuery } from "@/lib/search";
 import { EmptyState } from "./empty-state";
 import { FilterSelect } from "./filter-select";
@@ -24,20 +26,31 @@ export function PerformanceDirectory({
   composers,
   cities,
   venues,
+  locale,
+  dictionary,
 }: {
   performances: Performance[];
   composers: Composer[];
   cities: string[];
   venues: string[];
+  locale?: Locale;
+  dictionary?: Dictionary;
 }) {
   const [query, setQuery] = useState("");
   const [city, setCity] = useState("");
   const [dateRange, setDateRange] = useState("");
   const [composerId, setComposerId] = useState("");
   const [venue, setVenue] = useState("");
+  const activeLocale = locale ?? defaultLocale;
+  const t = dictionary ?? getDictionary(activeLocale);
 
   const composerMap = useMemo(() => new Map(composers.map((composer) => [composer.id, composer])), [composers]);
   const composerOptions = composers.map((composer) => ({ label: composer.nameCn, value: composer.id }));
+  const dateOptions = [
+    { value: "7", label: t.filters.next7Days },
+    { value: "30", label: t.filters.next30Days },
+    { value: "90", label: t.filters.next90Days },
+  ];
 
   const filtered = useMemo(
     () =>
@@ -64,21 +77,21 @@ export function PerformanceDirectory({
   return (
     <div className="space-y-7">
       <div className="grid gap-4 rounded-3xl border border-border bg-white/60 p-4 shadow-sm md:grid-cols-5">
-        <SearchBox value={query} onChange={setQuery} label="搜索演出" placeholder="城市、场馆、曲目..." />
-        <FilterSelect value={city} onChange={setCity} label="城市" allLabel="全部城市" options={cities} />
-        <FilterSelect value={dateRange} onChange={setDateRange} label="日期" allLabel="全部日期" options={[{ value: "7", label: "未来 7 天" }, { value: "30", label: "未来 30 天" }, { value: "90", label: "未来 90 天" }]} />
-        <FilterSelect value={composerId} onChange={setComposerId} label="作曲家" allLabel="全部作曲家" options={composerOptions} />
-        <FilterSelect value={venue} onChange={setVenue} label="场馆" allLabel="全部场馆" options={venues} />
+        <SearchBox value={query} onChange={setQuery} label={t.filters.performanceSearch} placeholder={t.filters.performancePlaceholder} />
+        <FilterSelect value={city} onChange={setCity} label={t.filters.city} allLabel={t.filters.allCities} options={cities} />
+        <FilterSelect value={dateRange} onChange={setDateRange} label={t.filters.date} allLabel={t.filters.allDates} options={dateOptions} />
+        <FilterSelect value={composerId} onChange={setComposerId} label={t.filters.composer} allLabel={t.filters.allComposers} options={composerOptions} />
+        <FilterSelect value={venue} onChange={setVenue} label={t.filters.venue} allLabel={t.filters.allVenues} options={venues} />
       </div>
-      <p className="text-sm text-muted">找到 {filtered.length} 场演出</p>
+      <p className="text-sm text-muted">{t.counts.performances(filtered.length)}</p>
       {filtered.length ? (
         <div className="grid gap-5 lg:grid-cols-2">
           {filtered.map((performance) => (
-            <PerformanceCard key={performance.id} performance={performance} />
+            <PerformanceCard key={performance.id} performance={performance} locale={activeLocale} dictionary={t} />
           ))}
         </div>
       ) : (
-        <EmptyState />
+        <EmptyState title={t.empty.title} description={t.empty.description} />
       )}
     </div>
   );
