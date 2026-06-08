@@ -1,6 +1,9 @@
 name = "cantabile"
-pages_build_output_dir = "out"
 compatibility_date = "2026-06-08"
+
+[assets]
+directory = "./out"
+not_found_handling = "404-page"
 
 [vars]
 CLOUDFLARE_EXPORT = "1"
