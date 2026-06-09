@@ -16,3 +16,15 @@ binding = "DB"
 database_name = "cantabile"
 database_id = "46cbd083-985a-4c22-a6d2-5ad302f89957"
 migrations_dir = "drizzle/d1"
+
+[observability]
+head_sampling_rate = 1
+
+[observability.logs]
+enabled = true
+head_sampling_rate = 1
+persist = true
+invocation_logs = true
+
+[observability.traces]
+enabled = true
