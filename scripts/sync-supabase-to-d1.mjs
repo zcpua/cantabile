@@ -22,7 +22,6 @@ try {
 
   const statements = [
     "PRAGMA foreign_keys=OFF;",
-    "BEGIN TRANSACTION;",
     "DELETE FROM articles;",
     "DELETE FROM performances;",
     "DELETE FROM works;",
@@ -83,7 +82,6 @@ try {
       related_composer_ids: sqliteJsonValue(article.related_composer_ids),
       related_work_ids: sqliteJsonValue(article.related_work_ids),
     })),
-    "COMMIT;",
     "PRAGMA foreign_keys=ON;",
   ].filter(Boolean);
 
