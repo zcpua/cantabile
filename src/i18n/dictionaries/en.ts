@@ -1,7 +1,7 @@
 export const en = {
   site: {
-    name: "Cantabile",
-    shortName: "Cantabile",
+    name: "forenote",
+    shortName: "forenote",
     description: "A classical music guide for composers, works, concerts, and listening notes.",
     archiveLabel: "Archive",
     footer: "A content gateway for classical music beginners and listeners. The MVP uses curated static data and can later grow into a database-backed concert and listening archive.",
@@ -18,7 +18,7 @@ export const en = {
   home: {
     eyebrow: "A classical music archive",
     title: "Enter the concert hall through one composer.",
-    description: "Cantabile gathers composers, essential works, upcoming concerts, and listening guides so new and curious listeners can find the next piece to hear.",
+    description: "forenote gathers composers, essential works, upcoming concerts, and listening guides so new and curious listeners can find the next piece to hear.",
     browseComposers: "Browse composers",
     viewPerformances: "View concerts",
     sections: {
@@ -33,10 +33,10 @@ export const en = {
     works: { eyebrow: "Works Catalogue", title: "Works", description: "Build a listening path across symphonies, concertos, piano pieces, and ballets.", meta: "Browse classical works by composer, genre, period, and keyword." },
     performances: { eyebrow: "Concert Calendar", title: "Concerts", description: "Curated sample concert data for the first version of the site.", meta: "Browse upcoming classical concerts by city, date, composer, venue, and keyword." },
     articles: { eyebrow: "Listening Guides", title: "Guides", description: "Short essays for entering a composer, a work, or a concert.", meta: "Read beginner guides, composer notes, work listening guides, and concert previews." },
-    about: { eyebrow: "About Cantabile", title: "About Cantabile", description: "Not an encyclopedia, but a quiet archive for beginning to listen.", meta: "Learn about Cantabile, a classical music site for composers, works, concerts, and listeners." },
+    about: { eyebrow: "About forenote", title: "About forenote", description: "Not an encyclopedia, but a quiet archive for beginning to listen.", meta: "Learn about forenote, a classical music site for composers, works, concerts, and listeners." },
   },
   about: [
-    "Cantabile is built for classical music beginners, enthusiasts, and concertgoers who want to enter music through composers, representative works, and concert programs.",
+    "forenote is built for classical music beginners, enthusiasts, and concertgoers who want to enter music through composers, representative works, and concert programs.",
     "The current version uses curated static content to validate browsing, filtering, search, detail pages, and SEO. Later versions can add a database, editorial tools, real concert feeds, and richer listening paths.",
     "The goal is to feel like both a concert program and a quiet archive: clear, restrained, and warm.",
   ],

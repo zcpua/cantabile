@@ -1,5 +1,5 @@
 export const site = {
-  name: "Cantabile 如歌",
+  name: "forenote / 有谱",
   description:
     "面向古典音乐爱好者、初学者和演出观众的作曲家、作品与演出内容网站。",
   url: "https://cantabile.vercel.app",
