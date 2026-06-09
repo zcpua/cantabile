@@ -14,5 +14,5 @@ service = "cantabile"
 [[d1_databases]]
 binding = "DB"
 database_name = "cantabile"
-database_id = "replace-with-cloudflare-d1-database-id"
+database_id = "46cbd083-985a-4c22-a6d2-5ad302f89957"
 migrations_dir = "drizzle/d1"
