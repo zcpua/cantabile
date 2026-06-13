@@ -1,7 +1,18 @@
-import { and, asc, desc, eq, isNull } from "drizzle-orm";
+import { and, asc, count, desc, eq, isNull } from "drizzle-orm";
 import type { AnyDb, PgDb, D1Db } from "./env";
 import * as pg from "@/db/schema.pg";
 import * as sqlite from "@/db/schema.sqlite";
+
+// Debug-only connectivity probe: runs one trivial COUNT to confirm the DB
+// binding/connection is reachable from the current runtime.
+export async function pingDb(db: AnyDb, dbType: "postgres" | "d1") {
+  if (dbType === "postgres") {
+    const [row] = await (db as PgDb).select({ value: count() }).from(pg.composers);
+    return row.value;
+  }
+  const [row] = await (db as D1Db).select({ value: count() }).from(sqlite.composers);
+  return row.value;
+}
 
 export async function listComposers(db: AnyDb, dbType: "postgres" | "d1") {
   if (dbType === "postgres") {
