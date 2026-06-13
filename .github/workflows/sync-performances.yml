@@ -1,0 +1,55 @@
+name: Sync Performances
+
+on:
+  workflow_dispatch:
+    inputs:
+      sources:
+        description: "Sources to sync (comma-separated: chncpa,shso,bjch,shch or 'all')"
+        required: false
+        default: "all"
+      max_pages:
+        description: "Max CHNCPA list pages"
+        required: false
+        default: "5"
+  schedule:
+    - cron: "47 18 * * *"
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+      R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+      R2_BUCKET_NAME: ${{ vars.R2_BUCKET_NAME || 'forenoteimg' }}
+      R2_PUBLIC_DOMAIN: ${{ vars.R2_PUBLIC_DOMAIN || 'rrrr2.516.chat' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+
+      - name: Sync CHNCPA
+        if: contains(inputs.sources || 'all', 'chncpa') || contains(inputs.sources || 'all', 'all')
+        run: npm run sync:chncpa -- --max-pages ${{ inputs.max_pages || '5' }}
+        continue-on-error: true
+
+      - name: Sync SHSO
+        if: contains(inputs.sources || 'all', 'shso') || contains(inputs.sources || 'all', 'all')
+        run: npm run sync:shso
+        continue-on-error: true
+
+      - name: Sync BJCH
+        if: contains(inputs.sources || 'all', 'bjch') || contains(inputs.sources || 'all', 'all')
+        run: npm run sync:bjch
+        continue-on-error: true
+
+      - name: Sync SHCH
+        if: contains(inputs.sources || 'all', 'shch') || contains(inputs.sources || 'all', 'all')
+        run: npm run sync:shch
+        continue-on-error: true

@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { index, integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
+import { index, integer, primaryKey, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
 import type { Article, Composer, Performance, Work } from "@/data/types";
 
 export const composers = sqliteTable("composers", {
@@ -60,12 +60,21 @@ export const performances = sqliteTable("performances", {
   ticketUrl: text("ticket_url"),
   sourceUrl: text("source_url").notNull(),
   sourceName: text("source_name").notNull(),
+  imageUrl: text("image_url"),
+  priceLabel: text("price_label"),
+  saleStatus: text("sale_status"),
+  address: text("address"),
+  intro: text("intro"),
+  isClassical: integer("is_classical", { mode: "boolean" }),
+  sourceId: text("source_id"),
+  sourceMetadata: text("source_metadata", { mode: "json" }).$type<Performance["sourceMetadata"]>(),
   createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
   updatedAt: text("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
 }, (table) => [
   index("performances_starts_at_idx").on(table.startsAt),
   index("performances_city_idx").on(table.city),
   index("performances_venue_idx").on(table.venue),
+  uniqueIndex("performances_source_id_unique").on(table.sourceId),
 ]);
 
 export const articles = sqliteTable("articles", {
@@ -84,4 +93,32 @@ export const articles = sqliteTable("articles", {
 }, (table) => [
   index("articles_published_at_idx").on(table.publishedAt),
   index("articles_category_idx").on(table.category),
+]);
+
+// Wechat mini-program user, identified by openid injected by the cloud-hosting gateway.
+export const users = sqliteTable("users", {
+  openid: text("openid").primaryKey(),
+  unionid: text("unionid"),
+  nickname: text("nickname"),
+  avatarUrl: text("avatar_url"),
+  createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  updatedAt: text("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+});
+
+export const favorites = sqliteTable("favorites", {
+  openid: text("openid").notNull().references(() => users.openid, { onDelete: "cascade" }),
+  performanceId: text("performance_id").notNull().references(() => performances.id, { onDelete: "cascade" }),
+  createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+}, (table) => [
+  primaryKey({ columns: [table.openid, table.performanceId] }),
+  index("favorites_openid_idx").on(table.openid),
+]);
+
+export const tickets = sqliteTable("tickets", {
+  openid: text("openid").notNull().references(() => users.openid, { onDelete: "cascade" }),
+  performanceId: text("performance_id").notNull().references(() => performances.id, { onDelete: "cascade" }),
+  createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+}, (table) => [
+  primaryKey({ columns: [table.openid, table.performanceId] }),
+  index("tickets_openid_idx").on(table.openid),
 ]);

@@ -120,6 +120,33 @@ src/lib/search.ts
 src/lib/filters.ts
 ```
 
+## 古典作品库（Wikidata + IMSLP）
+
+`classical_works` 表是站点的"作品权威库"，由两个上游构建：Wikidata
+作为主数据（作曲家、作品、作品编号、调性、体裁、创作时间、QID），IMSLP
+作为补充（乐谱页 URL、目录编号、IMSLP page id）。流水线分三步：
+
+```bash
+# 1) 拉取 20 位精选作曲家及其作品（SPARQL，写入 wikidata_composers / wikidata_works）
+npm run sync:wikidata:dry-run     # 看一下
+npm run sync:wikidata             # 写库
+
+# 2) 全量镜像 IMSLP 的 people / works 列表（写入 imslp_people_raw / imslp_works_raw）
+npm run sync:imslp:dry-run        # 跑一页确认连通
+npm run sync:imslp                # 完整同步，约 70 万条 works
+
+# 3) 按 catalog / 标题 / 调性 / 体裁 多级匹配，物化到 classical_works
+npm run match:classical-works:dry-run
+npm run match:classical-works
+```
+
+匹配规则按以下优先级 fall through：`exact-link` → `exact-catalog` →
+`normalized-title-key` → `normalized-title-genre`，命中等级写入
+`classical_works.match_confidence`。未命中的条目可以通过 `--report-misses`
+列出，再人工补 `match_confidence = 'manual'`。
+
+精选作曲家的 QID 列表在 `scripts/lib/composer-seed.mjs`，新增作曲家时同步该文件。
+
 ## 路由
 
 ```txt

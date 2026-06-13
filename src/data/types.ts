@@ -52,6 +52,35 @@ export type Performance = {
   ticketUrl?: string;
   sourceUrl: string;
   sourceName: string;
+  imageUrl?: string;
+  priceLabel?: string;
+  saleStatus?: string;
+  address?: string;
+  intro?: string;
+  isClassical?: boolean;
+  sourceId?: string;
+  sourceMetadata?: Record<string, unknown>;
+};
+
+export type ClassicalWork = {
+  id: string;
+  composerQid: string;
+  composerName: string;
+  composerNameZh?: string;
+  wikidataQid: string;
+  imslpId?: string;
+  imslpUrl?: string;
+  title: string;
+  catalog?: string;
+  musicKey?: string;
+  genre?: string;
+  compositionYear?: number;
+  matchConfidence?:
+    | "exact-catalog"
+    | "exact-link"
+    | "normalized-title-key"
+    | "normalized-title-genre"
+    | "manual";
 };
 
 export type Article = {

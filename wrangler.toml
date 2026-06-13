@@ -1,5 +1,5 @@
 name = "cantabile"
-main = ".open-next/worker.js"
+main = "worker.js"
 compatibility_date = "2026-06-08"
 compatibility_flags = ["nodejs_compat", "global_fetch_strictly_public"]
 
@@ -19,6 +19,10 @@ binding = "DB"
 database_name = "cantabile"
 database_id = "46cbd083-985a-4c22-a6d2-5ad302f89957"
 migrations_dir = "drizzle/d1"
+
+[[r2_buckets]]
+binding = "IMAGES"
+bucket_name = "cantabile-images"
 
 [observability]
 head_sampling_rate = 1

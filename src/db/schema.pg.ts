@@ -1,4 +1,4 @@
-import { boolean, index, integer, jsonb, pgTable, text, timestamp } from "drizzle-orm/pg-core";
+import { boolean, index, integer, jsonb, pgTable, primaryKey, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
 import type { Article, Composer, Performance, Work } from "@/data/types";
 
 export const composers = pgTable("composers", {
@@ -59,12 +59,21 @@ export const performances = pgTable("performances", {
   ticketUrl: text("ticket_url"),
   sourceUrl: text("source_url").notNull(),
   sourceName: text("source_name").notNull(),
+  imageUrl: text("image_url"),
+  priceLabel: text("price_label"),
+  saleStatus: text("sale_status"),
+  address: text("address"),
+  intro: text("intro"),
+  isClassical: boolean("is_classical"),
+  sourceId: text("source_id"),
+  sourceMetadata: jsonb("source_metadata").$type<Performance["sourceMetadata"]>(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => [
   index("performances_starts_at_idx").on(table.startsAt),
   index("performances_city_idx").on(table.city),
   index("performances_venue_idx").on(table.venue),
+  uniqueIndex("performances_source_id_unique").on(table.sourceId),
 ]);
 
 export const articles = pgTable("articles", {
@@ -83,4 +92,32 @@ export const articles = pgTable("articles", {
 }, (table) => [
   index("articles_published_at_idx").on(table.publishedAt),
   index("articles_category_idx").on(table.category),
+]);
+
+// Wechat mini-program user, identified by openid injected by the cloud-hosting gateway.
+export const users = pgTable("users", {
+  openid: text("openid").primaryKey(),
+  unionid: text("unionid"),
+  nickname: text("nickname"),
+  avatarUrl: text("avatar_url"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const favorites = pgTable("favorites", {
+  openid: text("openid").notNull().references(() => users.openid, { onDelete: "cascade" }),
+  performanceId: text("performance_id").notNull().references(() => performances.id, { onDelete: "cascade" }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  primaryKey({ columns: [table.openid, table.performanceId] }),
+  index("favorites_openid_idx").on(table.openid),
+]);
+
+export const tickets = pgTable("tickets", {
+  openid: text("openid").notNull().references(() => users.openid, { onDelete: "cascade" }),
+  performanceId: text("performance_id").notNull().references(() => performances.id, { onDelete: "cascade" }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  primaryKey({ columns: [table.openid, table.performanceId] }),
+  index("tickets_openid_idx").on(table.openid),
 ]);
