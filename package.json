@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "dev:api": "tsx watch src/server/entry/node.ts",
+    "dev:wxcloud": "(docker network inspect wxcb0 >/dev/null 2>&1 || docker network create wxcb0) && docker compose up --build app",
     "build:api": "tsup --config tsup.config.ts",
     "seed:supabase": "node scripts/generate-supabase-seed.mjs",
     "build": "next build",
