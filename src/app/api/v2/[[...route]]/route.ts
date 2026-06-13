@@ -1,11 +1,11 @@
 import { handle } from "hono/vercel";
-import { app } from "@/server/app";
+import { createApp } from "@/server/app";
 import { pgMiddleware } from "@/server/middleware/pg";
 
 const databaseUrl = process.env.DATABASE_URL;
 if (!databaseUrl) throw new Error("DATABASE_URL is required");
 
-app.use("*", pgMiddleware(databaseUrl));
+const app = createApp(pgMiddleware(databaseUrl));
 
 export const GET = handle(app);
 export const POST = handle(app);

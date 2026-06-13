@@ -15,16 +15,19 @@ export { DOShardedTagCache } from "./.open-next/.build/durable-objects/sharded-t
 //@ts-expect-error: Will be resolved by wrangler build
 export { BucketCachePurge } from "./.open-next/.build/durable-objects/bucket-cache-purge.js";
 
-import { app } from "./src/server/app.js";
+import { createApp } from "./src/server/app.js";
 import { d1Middleware } from "./src/server/middleware/d1.js";
+
+// Built lazily on first request, once the D1 binding is available, then reused.
+let apiApp;
 
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
 
     if (url.pathname.startsWith("/api/v2")) {
-      app.use("*", d1Middleware(env.DB));
-      return app.fetch(request, env, ctx);
+      apiApp ??= createApp(d1Middleware(env.DB));
+      return apiApp.fetch(request, env, ctx);
     }
 
     return runWithCloudflareRequestContext(request, env, ctx, async () => {

@@ -1,0 +1,25 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile.development
+    volumes:
+      - .:/app
+      - /app/node_modules
+    ports:
+      - '27081:80'
+    container_name: wxcloud_cantabile-api
+    labels:
+      - wxPort=27082
+      - hostPort=27081
+      - wxcloud=cantabile-api
+      - role=container
+    env_file:
+      - .env.local
+    environment:
+      - PORT=80
+      - WECHAT_DEV_OPENID=dev-openid
+networks:
+  default:
+    name: wxcb0
+    external: true
