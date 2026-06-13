@@ -39,4 +39,4 @@ jobs:
             --releaseType FULL \
             --noConfirm \
             --override \
-            --envParamsJson "$(node -e 'console.log(JSON.stringify({DATABASE_URL: process.env.DATABASE_URL}))')"
+            --envParams "DATABASE_URL=$DATABASE_URL"
