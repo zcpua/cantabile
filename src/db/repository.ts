@@ -199,6 +199,14 @@ function mapPerformanceRow(row: PerformanceRow): Performance {
     ticketUrl: row.ticketUrl ?? undefined,
     sourceUrl: row.sourceUrl,
     sourceName: row.sourceName,
+    imageUrl: row.imageUrl ?? undefined,
+    priceLabel: row.priceLabel ?? undefined,
+    saleStatus: row.saleStatus ?? undefined,
+    address: row.address ?? undefined,
+    intro: row.intro ?? undefined,
+    isClassical: row.isClassical ?? undefined,
+    sourceId: row.sourceId ?? undefined,
+    sourceMetadata: asRecord(row.sourceMetadata),
   };
 }
 
@@ -255,6 +263,11 @@ function asProgram(value: unknown): Performance["program"] {
       displayTitle: item.displayTitle,
     }];
   });
+}
+
+function asRecord(value: unknown) {
+  const parsed = parseJson(value);
+  return isRecord(parsed) ? parsed : undefined;
 }
 
 function parseJson(value: unknown) {

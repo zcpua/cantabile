@@ -1,0 +1,11 @@
+node_modules
+dist
+.next
+.open-next
+.wrangler
+.tmp
+out
+taro
+.git
+.DS_Store
+*.log

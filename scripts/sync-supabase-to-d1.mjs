@@ -1,9 +1,11 @@
-import { mkdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 import postgres from "postgres";
 
 const root = resolve(new URL("..", import.meta.url).pathname);
+loadEnvFiles([".env", ".env.local"]);
+
 const outputPath = resolve(root, ".tmp/supabase-to-d1.sql");
 const databaseUrl = process.env.DATABASE_URL;
 const d1Database = process.env.CLOUDFLARE_D1_DATABASE_NAME ?? "cantabile";
@@ -16,7 +18,7 @@ try {
   const [composers, works, performances, articles] = await Promise.all([
     sql`select id, slug, name, name_cn, birth_year, death_year, country, period, portrait_url, short_bio, bio, style_tags, timeline, starter_work_ids, related_composer_ids, featured from public.composers order by birth_year asc`,
     sql`select id, slug, composer_id, title, title_cn, year, genre, period, description, movements, listening_links, featured from public.works order by year is null, year asc`,
-    sql`select id, title, city, venue, starts_at, artists, program, ticket_url, source_url, source_name from public.performances order by starts_at asc`,
+    sql`select id, title, city, venue, starts_at, artists, program, ticket_url, source_url, source_name, image_url, price_label, sale_status, address, intro, is_classical, source_id, source_metadata from public.performances order by starts_at asc`,
     sql`select id, slug, title, excerpt, cover_url, category, published_at, content, related_composer_ids, related_work_ids from public.articles order by published_at desc`,
   ]);
 
@@ -58,7 +60,7 @@ try {
       listening_links: sqliteJsonValue(work.listening_links),
       featured: sqliteValue(Boolean(work.featured)),
     })),
-    insertStatement("performances", ["id", "title", "city", "venue", "starts_at", "artists", "program", "ticket_url", "source_url", "source_name"], performances, (performance) => ({
+    insertStatement("performances", ["id", "title", "city", "venue", "starts_at", "artists", "program", "ticket_url", "source_url", "source_name", "image_url", "price_label", "sale_status", "address", "intro", "is_classical", "source_id", "source_metadata"], performances, (performance) => ({
       id: sqliteValue(performance.id),
       title: sqliteValue(performance.title),
       city: sqliteValue(performance.city),
@@ -69,6 +71,14 @@ try {
       ticket_url: sqliteValue(performance.ticket_url),
       source_url: sqliteValue(performance.source_url),
       source_name: sqliteValue(performance.source_name),
+      image_url: sqliteValue(performance.image_url),
+      price_label: sqliteValue(performance.price_label),
+      sale_status: sqliteValue(performance.sale_status),
+      address: sqliteValue(performance.address),
+      intro: sqliteValue(performance.intro),
+      is_classical: sqliteValue(performance.is_classical),
+      source_id: sqliteValue(performance.source_id),
+      source_metadata: sqliteJsonValue(performance.source_metadata),
     })),
     insertStatement("articles", ["id", "slug", "title", "excerpt", "cover_url", "category", "published_at", "content", "related_composer_ids", "related_work_ids"], articles, (article) => ({
       id: sqliteValue(article.id),
@@ -129,4 +139,25 @@ function quote(value) {
 
 function toIsoString(value) {
   return value instanceof Date ? value.toISOString() : String(value);
+}
+
+function loadEnvFiles(files) {
+  for (const file of files) {
+    const path = resolve(root, file);
+    if (!existsSync(path)) continue;
+
+    for (const line of readFileSync(path, "utf8").split(/\r?\n/)) {
+      const match = line.match(/^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)?\s*$/);
+      if (!match || process.env[match[1]] !== undefined) continue;
+      process.env[match[1]] = unquoteEnvValue(match[2] ?? "");
+    }
+  }
+}
+
+function unquoteEnvValue(value) {
+  const trimmed = value.trim();
+  if ((trimmed.startsWith('"') && trimmed.endsWith('"')) || (trimmed.startsWith("'") && trimmed.endsWith("'"))) {
+    return trimmed.slice(1, -1);
+  }
+  return trimmed;
 }

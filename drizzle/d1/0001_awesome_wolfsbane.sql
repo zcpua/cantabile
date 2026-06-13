@@ -1,0 +1,9 @@
+ALTER TABLE `performances` ADD `image_url` text;--> statement-breakpoint
+ALTER TABLE `performances` ADD `price_label` text;--> statement-breakpoint
+ALTER TABLE `performances` ADD `sale_status` text;--> statement-breakpoint
+ALTER TABLE `performances` ADD `address` text;--> statement-breakpoint
+ALTER TABLE `performances` ADD `intro` text;--> statement-breakpoint
+ALTER TABLE `performances` ADD `is_classical` integer;--> statement-breakpoint
+ALTER TABLE `performances` ADD `source_id` text;--> statement-breakpoint
+ALTER TABLE `performances` ADD `source_metadata` text;--> statement-breakpoint
+CREATE UNIQUE INDEX `performances_source_id_unique` ON `performances` (`source_id`);
