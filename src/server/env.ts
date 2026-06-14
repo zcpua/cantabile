@@ -7,9 +7,19 @@ export type PgDb = PostgresJsDatabase<typeof pgSchema>;
 export type D1Db = DrizzleD1Database<typeof sqliteSchema>;
 export type AnyDb = PgDb | D1Db;
 
+// Uploads avatar bytes to object storage and returns the public URL. Each
+// runtime supplies its own implementation: Cloudflare uses the R2 binding,
+// Node/Vercel uses the S3-compatible client.
+export type AvatarUploader = (input: {
+  bytes: Uint8Array;
+  contentType: string;
+  key: string;
+}) => Promise<string>;
+
 export type AppEnv = {
   Variables: {
     db: AnyDb;
     dbType: "postgres" | "d1";
+    uploadAvatar: AvatarUploader;
   };
 };

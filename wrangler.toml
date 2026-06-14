@@ -5,6 +5,7 @@ compatibility_flags = ["nodejs_compat", "global_fetch_strictly_public"]
 
 [vars]
 DATABASE_RUNTIME = "d1"
+R2_PUBLIC_DOMAIN = "rrrr2.516.chat"
 
 [assets]
 directory = ".open-next/assets"
