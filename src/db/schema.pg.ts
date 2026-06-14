@@ -100,6 +100,7 @@ export const users = pgTable("users", {
   unionid: text("unionid"),
   nickname: text("nickname"),
   avatarUrl: text("avatar_url"),
+  avatarFileId: text("avatar_file_id"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });

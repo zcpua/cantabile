@@ -1,13 +1,18 @@
 import type { R2Bucket } from "@cloudflare/workers-types";
 import type { AvatarUploader } from "./env";
 
-// WeChat Cloud Run runtime: upload via tencent COS. Temp credentials come from
-// the platform's auth-free internal endpoint (no AK/SK env vars needed inside
-// the container). Returns the public https URL, so the bucket must be
-// configured for public read (or fronted by a CDN domain via COS_PUBLIC_DOMAIN).
+// WeChat Cloud Run runtime: upload to tencent COS with object-level
+// public-read ACL, returning the COS public https URL directly. Temp creds
+// come from the platform's auth-free endpoint (no AK/SK in the container).
+// NOTE: this only works if the managed COS bucket allows per-object ACL
+// override and public access — verify by opening the returned URL. If it 403s,
+// fall back to the worker→R2 transfer flow.
+// Also returns a wx cloud fileId (when COS_CLOUD_ENV is set) so the
+// mini-program can render the avatar via the wx cloud file.
 export function wxCosUploader(opts: {
   bucket: string;
   region: string;
+  cloudEnv?: string;
   publicDomain?: string;
 }): AvatarUploader {
   const host = opts.publicDomain || `${opts.bucket}.cos.${opts.region}.myqcloud.com`;
@@ -28,6 +33,7 @@ export function wxCosUploader(opts: {
           );
       },
     });
+
     await cos.putObject({
       Bucket: opts.bucket,
       Region: opts.region,
@@ -35,8 +41,13 @@ export function wxCosUploader(opts: {
       Body: Buffer.from(bytes),
       ContentLength: bytes.byteLength,
       ContentType: contentType,
+      ACL: "public-read",
     });
-    return `https://${host}/${key}?v=${Date.now()}`;
+
+    return {
+      url: `https://${host}/${key}?v=${Date.now()}`,
+      fileId: opts.cloudEnv ? `cloud://${opts.cloudEnv}.${opts.bucket}/${key}` : null,
+    };
   };
 }
 
@@ -45,7 +56,7 @@ export function wxCosUploader(opts: {
 export function r2Uploader(bucket: R2Bucket, publicDomain: string): AvatarUploader {
   return async ({ bytes, contentType, key }) => {
     await bucket.put(key, bytes, { httpMetadata: { contentType } });
-    return `https://${publicDomain}/${key}?v=${Date.now()}`;
+    return { url: `https://${publicDomain}/${key}?v=${Date.now()}` };
   };
 }
 
@@ -67,6 +78,6 @@ export function s3Uploader(publicDomain: string): AvatarUploader {
     await client.send(
       new PutObjectCommand({ Bucket: bucket, Key: key, Body: bytes, ContentType: contentType })
     );
-    return `https://${publicDomain}/${key}?v=${Date.now()}`;
+    return { url: `https://${publicDomain}/${key}?v=${Date.now()}` };
   };
 }

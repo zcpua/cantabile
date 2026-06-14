@@ -82,7 +82,7 @@ export async function findPerformanceById(db: AnyDb, dbType: "postgres" | "d1", 
 export async function upsertUser(
   db: AnyDb,
   dbType: "postgres" | "d1",
-  user: { openid: string; unionid?: string | null; nickname?: string | null; avatarUrl?: string | null }
+  user: { openid: string; unionid?: string | null; nickname?: string | null; avatarUrl?: string | null; avatarFileId?: string | null }
 ) {
   if (dbType === "postgres") {
     await (db as PgDb)
@@ -92,6 +92,7 @@ export async function upsertUser(
         unionid: user.unionid ?? null,
         nickname: user.nickname ?? null,
         avatarUrl: user.avatarUrl ?? null,
+        avatarFileId: user.avatarFileId ?? null,
       })
       .onConflictDoUpdate({
         target: pg.users.openid,
@@ -99,6 +100,7 @@ export async function upsertUser(
           unionid: user.unionid ?? null,
           nickname: user.nickname ?? null,
           avatarUrl: user.avatarUrl ?? null,
+          avatarFileId: user.avatarFileId ?? null,
           updatedAt: new Date(),
         },
       });
@@ -111,6 +113,7 @@ export async function upsertUser(
       unionid: user.unionid ?? null,
       nickname: user.nickname ?? null,
       avatarUrl: user.avatarUrl ?? null,
+      avatarFileId: user.avatarFileId ?? null,
     })
     .onConflictDoUpdate({
       target: sqlite.users.openid,
@@ -118,6 +121,7 @@ export async function upsertUser(
         unionid: user.unionid ?? null,
         nickname: user.nickname ?? null,
         avatarUrl: user.avatarUrl ?? null,
+        avatarFileId: user.avatarFileId ?? null,
       },
     });
 }

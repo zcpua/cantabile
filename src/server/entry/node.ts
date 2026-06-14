@@ -6,14 +6,15 @@ import { s3Uploader, wxCosUploader } from "../uploaders";
 const databaseUrl = process.env.DATABASE_URL;
 if (!databaseUrl) throw new Error("DATABASE_URL is required");
 
-// Inside WeChat Cloud Run we upload via tencent COS using the platform's
-// auth-free credential endpoint; elsewhere (e.g. local/Vercel-node) fall back
+// Inside WeChat Cloud Run we upload to tencent COS with public-read ACL and
+// return the COS public URL directly; elsewhere (local/Vercel-node) fall back
 // to the S3-compatible R2 client.
 const cosBucket = process.env.COS_BUCKET;
 const uploadAvatar = cosBucket
   ? wxCosUploader({
       bucket: cosBucket,
       region: process.env.COS_REGION ?? "ap-shanghai",
+      cloudEnv: process.env.COS_CLOUD_ENV,
       publicDomain: process.env.COS_PUBLIC_DOMAIN,
     })
   : s3Uploader(process.env.R2_PUBLIC_DOMAIN ?? "");

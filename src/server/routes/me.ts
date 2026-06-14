@@ -41,24 +41,28 @@ export const meRoute = new Hono<AppEnv>()
     const body = await c.req.json().catch(() => ({}) as Record<string, unknown>);
     const nickname = typeof body.nickname === "string" ? body.nickname.trim().slice(0, 32) : undefined;
 
+    const existing = await findUser(c.get("db"), c.get("dbType"), openid);
     let avatarUrl: string | undefined;
+    let avatarFileId: string | null | undefined;
     if (typeof body.avatarBase64 === "string" && body.avatarBase64) {
       const decoded = decodeDataUrl(body.avatarBase64);
       if (!decoded) return c.json({ error: "invalid avatar" }, 400);
       const ext = decoded.contentType === "image/png" ? "png" : "jpg";
-      avatarUrl = await c.get("uploadAvatar")({
+      const result = await c.get("uploadAvatar")({
         bytes: decoded.bytes,
         contentType: decoded.contentType,
         key: `avatars/${openid}.${ext}`,
       });
+      avatarUrl = result.url;
+      avatarFileId = result.fileId ?? null;
     }
 
-    const existing = await findUser(c.get("db"), c.get("dbType"), openid);
     await upsertUser(c.get("db"), c.get("dbType"), {
       openid,
       unionid,
       nickname: nickname ?? existing?.nickname ?? null,
       avatarUrl: avatarUrl ?? existing?.avatarUrl ?? null,
+      avatarFileId: avatarFileId ?? existing?.avatarFileId ?? null,
     });
     const user = await findUser(c.get("db"), c.get("dbType"), openid);
     return c.json({ openid, user });
