@@ -1,12 +1,24 @@
 import { serve } from "@hono/node-server";
 import { createApp } from "../app";
 import { pgMiddleware } from "../middleware/pg";
-import { s3Uploader } from "../uploaders";
+import { s3Uploader, wxCosUploader } from "../uploaders";
 
 const databaseUrl = process.env.DATABASE_URL;
 if (!databaseUrl) throw new Error("DATABASE_URL is required");
 
-const app = createApp(pgMiddleware(databaseUrl), s3Uploader(process.env.R2_PUBLIC_DOMAIN ?? ""));
+// Inside WeChat Cloud Run we upload via tencent COS using the platform's
+// auth-free credential endpoint; elsewhere (e.g. local/Vercel-node) fall back
+// to the S3-compatible R2 client.
+const cosBucket = process.env.COS_BUCKET;
+const uploadAvatar = cosBucket
+  ? wxCosUploader({
+      bucket: cosBucket,
+      region: process.env.COS_REGION ?? "ap-shanghai",
+      publicDomain: process.env.COS_PUBLIC_DOMAIN,
+    })
+  : s3Uploader(process.env.R2_PUBLIC_DOMAIN ?? "");
+
+const app = createApp(pgMiddleware(databaseUrl), uploadAvatar);
 
 const port = Number(process.env.PORT || 3001);
 

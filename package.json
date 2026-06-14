@@ -44,6 +44,7 @@
     "@hono/node-server": "^1.14.1",
     "@opennextjs/cloudflare": "^1.19.11",
     "@vercel/analytics": "^2.0.1",
+    "cos-nodejs-sdk-v5": "^2.15.4",
     "drizzle-orm": "^0.45.2",
     "hono": "^4.12.25",
     "next": "16.2.7",
