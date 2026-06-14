@@ -101,6 +101,7 @@ export const users = sqliteTable("users", {
   unionid: text("unionid"),
   nickname: text("nickname"),
   avatarUrl: text("avatar_url"),
+  avatarFileId: text("avatar_file_id"),
   createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
   updatedAt: text("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
 });

@@ -7,14 +7,24 @@ export type PgDb = PostgresJsDatabase<typeof pgSchema>;
 export type D1Db = DrizzleD1Database<typeof sqliteSchema>;
 export type AnyDb = PgDb | D1Db;
 
-// Uploads avatar bytes to object storage and returns the public URL. Each
-// runtime supplies its own implementation: Cloudflare uses the R2 binding,
-// Node/Vercel uses the S3-compatible client.
+// Uploads avatar bytes to object storage and returns the stored references.
+// Each runtime supplies its own implementation:
+//   - Cloudflare worker: writes straight to the R2 binding
+//   - Node/Vercel: writes via the S3-compatible client
+//   - WeChat Cloud Run: writes to COS, then hands a signed URL to the
+//     Cloudflare worker which copies it into R2 (the container can't reach
+//     R2's S3 endpoint from China). `fileId` is the wx cloud file id the
+//     mini-program can render directly; `url` is the public R2 https link.
+export type AvatarUploadResult = {
+  url: string;
+  fileId?: string | null;
+};
+
 export type AvatarUploader = (input: {
   bytes: Uint8Array;
   contentType: string;
   key: string;
-}) => Promise<string>;
+}) => Promise<AvatarUploadResult>;
 
 export type AppEnv = {
   Variables: {
