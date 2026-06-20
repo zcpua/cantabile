@@ -3,6 +3,7 @@ import type { AppEnv } from "../env";
 import { wechatAuth } from "../middleware/wechat-auth";
 import {
   addCollection,
+  ensureUser,
   findPerformanceById,
   findUser,
   listCollection,
@@ -14,15 +15,13 @@ import {
 // All `/me/*` routes require a verified openid from the cloud-hosting gateway.
 export const meRoute = new Hono<AppEnv>()
   .use("*", wechatAuth)
-  // Login: gateway already proves openid; client may pass nickname/avatar
-  // captured via wx.getUserProfile so we keep them on the user record.
+  // Login: the gateway proves openid. WeChat no longer returns profile info
+  // here, so we only ensure the user row exists and never touch nickname/avatar
+  // (which the user sets later via /profile). Avoids wiping saved values.
   .post("/login", async (c) => {
     const openid = c.get("openid");
     const unionid = c.get("unionid") ?? null;
-    const body = await c.req.json().catch(() => ({}) as Record<string, unknown>);
-    const nickname = typeof body.nickname === "string" ? body.nickname : null;
-    const avatarUrl = typeof body.avatarUrl === "string" ? body.avatarUrl : null;
-    await upsertUser(c.get("db"), c.get("dbType"), { openid, unionid, nickname, avatarUrl });
+    await ensureUser(c.get("db"), c.get("dbType"), { openid, unionid });
     const user = await findUser(c.get("db"), c.get("dbType"), openid);
     return c.json({ openid, unionid, user });
   })

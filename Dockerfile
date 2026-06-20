@@ -1,14 +1,14 @@
-FROM node:22-alpine AS build
+FROM oven/bun:1 AS build
 WORKDIR /app
 COPY package.json package-lock.json ./
-RUN npm ci
+RUN bun install
 COPY . .
-RUN npx tsup --config tsup.config.ts
+RUN bunx tsup --config tsup.config.ts
 
-FROM node:22-alpine AS runner
+FROM oven/bun:1 AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=3000
 COPY --from=build /app/dist ./dist
 EXPOSE 3000
-CMD ["node", "dist/node.mjs"]
+CMD ["bun", "dist/node.mjs"]
