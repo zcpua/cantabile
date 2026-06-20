@@ -51,6 +51,64 @@ npm run build
 npm run start
 ```
 
+## 海外 Supabase 同步到国内 Supabase
+
+仓库内的 GitHub Action `Sync Overseas Supabase to Domestic Supabase` 会使用
+`pg_dump` 从海外 Supabase 导出业务表数据，再用 `pg_restore` 覆盖同步到国内
+Supabase。默认同步以下表：
+
+```txt
+public.composers
+public.works
+public.performances
+public.articles
+public.wikidata_composers
+public.wikidata_works
+public.imslp_people_raw
+public.imslp_works_raw
+public.classical_works
+```
+
+需要在 GitHub 仓库配置两个 Secrets：
+
+```txt
+DATABASE_URL=postgresql://...
+CN_DATABASE_URL=postgresql://...
+```
+
+第一次同步前，国内 Supabase 需要先有相同 schema。可以在本地或 CI 使用
+`supabase/migrations/` 里的迁移初始化国内项目，确认表结构一致后再运行同步。
+
+如果需要调整同步表，配置仓库 Variable `SUPABASE_SYNC_TABLES`，或手动运行
+Action 时填写 `tables` 输入。表名可用空格或逗号分隔，例如：
+
+```txt
+public.composers,public.works,public.performances,public.articles
+```
+
+国内 Supabase 的 `CN_DATABASE_URL` 建议使用 Session Pooler
+连接串，适合 GitHub Actions 这类 IPv4 环境和 `pg_dump`/`pg_restore` 长连接：
+
+```txt
+postgresql://postgres.<project-ref>:<db-password>@<pooler-host>:5432/postgres?sslmode=require
+```
+
+在 Supabase Dashboard 里进入国内项目：
+
+```txt
+Project Settings -> Database -> Connection string -> Session pooler
+```
+
+复制 URI 后替换密码，并确保末尾带上 `?sslmode=require`。不要使用 `anon`
+key、`service_role` key 或 HTTP API URL 作为 `DATABASE_URL`；这里需要的是
+Postgres 连接串。如果国内 Supabase 是自托管实例，也可以使用：
+
+```txt
+postgresql://<user>:<password>@<host>:5432/<database>?sslmode=require
+```
+
+前提是 GitHub Actions 能访问该地址，且数据库防火墙/白名单允许连接。
+
 ## Vercel 部署
 
 Vercel 使用默认 Next.js 构建即可：

@@ -1,0 +1,38 @@
+name: Sync Overseas Supabase to Domestic Supabase
+
+on:
+  workflow_dispatch:
+    inputs:
+      tables:
+        description: "Tables to sync (space/comma-separated, optional)"
+        required: false
+        default: ""
+  schedule:
+    - cron: "37 19 * * *"
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      CN_DATABASE_URL: ${{ secrets.CN_DATABASE_URL }}
+      SYNC_TABLES: ${{ inputs.tables || vars.SUPABASE_SYNC_TABLES }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install PostgreSQL 17 client
+        run: |
+          sudo install -d /usr/share/postgresql-common/pgdg
+          sudo curl --fail --show-error --location \
+            --output /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc \
+            https://www.postgresql.org/media/keys/ACCC4CF8.asc
+          . /etc/os-release
+          echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt ${VERSION_CODENAME}-pgdg main" | sudo tee /etc/apt/sources.list.d/pgdg.list
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client-17
+          echo "/usr/lib/postgresql/17/bin" >> "$GITHUB_PATH"
+          /usr/lib/postgresql/17/bin/pg_dump --version
+
+      - name: Sync overseas Supabase rows to domestic Supabase
+        run: bash scripts/sync-supabase-to-supabase.sh
