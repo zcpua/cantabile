@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { defaultLocale, isLocale, type Locale } from "@/i18n/config";
@@ -30,12 +31,24 @@ export function SiteFooter({ locale, dictionary }: { locale?: Locale; dictionary
           <p className="font-serif text-2xl font-semibold">{t.site.name}</p>
           <p className="mt-3 max-w-xl leading-7 text-ivory/70">{t.site.footer}</p>
         </div>
-        <div className="flex flex-wrap gap-x-5 gap-y-3 text-sm text-ivory/75 lg:justify-end">
-          {navItems.map((item) => (
-            <Link key={item.href} href={item.href} className="hover:text-gold">
-              {item.label}
-            </Link>
-          ))}
+        <div className="space-y-5 lg:text-right">
+          <div className="flex flex-wrap gap-x-5 gap-y-3 text-sm text-ivory/75 lg:justify-end">
+            {navItems.map((item) => (
+              <Link key={item.href} href={item.href} className="hover:text-gold">
+                {item.label}
+              </Link>
+            ))}
+          </div>
+          <a
+            href="https://www.upyun.com/league"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-2 text-sm text-ivory/65 transition-colors hover:text-gold lg:justify-end"
+            aria-label="又拍云联盟"
+          >
+            <Image src="/upyun-logo.svg" alt="" width={28} height={28} className="shrink-0" />
+            <span>又拍云联盟</span>
+          </a>
         </div>
       </div>
     </footer>

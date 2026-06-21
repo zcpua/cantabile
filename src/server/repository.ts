@@ -78,6 +78,27 @@ export async function findPerformanceById(db: AnyDb, dbType: "postgres" | "d1", 
   return row;
 }
 
+// Insert the user row if absent, leaving an existing row untouched. Used at
+// login: WeChat no longer hands us profile info there, so we must not clobber
+// a nickname/avatar the user set later via /profile.
+export async function ensureUser(
+  db: AnyDb,
+  dbType: "postgres" | "d1",
+  user: { openid: string; unionid?: string | null }
+) {
+  if (dbType === "postgres") {
+    await (db as PgDb)
+      .insert(pg.users)
+      .values({ openid: user.openid, unionid: user.unionid ?? null })
+      .onConflictDoNothing({ target: pg.users.openid });
+    return;
+  }
+  await (db as D1Db)
+    .insert(sqlite.users)
+    .values({ openid: user.openid, unionid: user.unionid ?? null })
+    .onConflictDoNothing({ target: sqlite.users.openid });
+}
+
 // Idempotent upsert: keep the latest nickname/avatar from WeChat profile.
 export async function upsertUser(
   db: AnyDb,

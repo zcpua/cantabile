@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Noto_Sans_SC, Noto_Serif_SC } from "next/font/google";
+import localFont from "next/font/local";
 import { Analytics } from "@vercel/analytics/next";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
@@ -9,17 +9,17 @@ import { getDictionary } from "@/i18n/dictionaries";
 import { homePath, localeAlternates } from "@/i18n/routes";
 import "./globals.css";
 
-const sans = Noto_Sans_SC({
+const sans = localFont({
+  src: "./fonts/NotoSansSC-Variable.ttf",
   variable: "--font-sans-cn",
-  subsets: ["latin"],
-  weight: ["400", "500", "700"],
+  weight: "100 900",
   display: "swap",
 });
 
-const serif = Noto_Serif_SC({
+const serif = localFont({
+  src: "./fonts/NotoSerifSC-Variable.ttf",
   variable: "--font-serif-cn",
-  subsets: ["latin"],
-  weight: ["500", "600", "700"],
+  weight: "100 900",
   display: "swap",
 });
 

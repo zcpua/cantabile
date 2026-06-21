@@ -21,6 +21,7 @@
     "d1:migrations:apply:local": "wrangler d1 migrations apply cantabile --local",
     "d1:migrations:apply:remote": "wrangler d1 migrations apply cantabile --remote",
     "sync:supabase-to-d1": "node scripts/sync-supabase-to-d1.mjs",
+    "sync:supabase-to-supabase": "bash scripts/sync-supabase-to-supabase.sh",
     "sync:performances": "node scripts/sync-chncpa-performances.mjs --save && node scripts/sync-shso-performances.mjs --save && node scripts/sync-bjch-performances.mjs --save && node scripts/sync-shch-performances.mjs --save",
     "sync:chncpa": "node scripts/sync-chncpa-performances.mjs --save",
     "sync:chncpa:dry-run": "node scripts/sync-chncpa-performances.mjs",
