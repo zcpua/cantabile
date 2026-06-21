@@ -40,7 +40,7 @@ export function SiteFooter({ locale, dictionary }: { locale?: Locale; dictionary
             ))}
           </div>
           <a
-            href="https://www.upyun.com/league"
+            href="https://www.upyun.com/?utm_source=lianmeng&utm_medium=referral"
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex max-w-full items-center gap-2 text-xs text-ivory/65 transition-colors hover:text-gold lg:justify-end"
