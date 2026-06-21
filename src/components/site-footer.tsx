@@ -48,7 +48,7 @@ export function SiteFooter({ locale, dictionary }: { locale?: Locale; dictionary
           >
             <span className="whitespace-nowrap">本网站由</span>
             <span className="inline-flex min-w-0 items-center gap-1.5">
-              <Image src="/upyun-logo.svg" alt="又拍云" width={104} height={39} className="h-auto w-16 shrink-0" />
+              <Image src="/upyun-logo.svg" alt="又拍云" width={104} height={39} className="h-auto w-14 shrink-0" />
             </span>
             <span className="whitespace-nowrap">提供 CDN 加速/云存储服务</span>
           </a>
