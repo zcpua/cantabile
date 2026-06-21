@@ -43,11 +43,16 @@ export function SiteFooter({ locale, dictionary }: { locale?: Locale; dictionary
             href="https://www.upyun.com/league"
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 text-sm text-ivory/65 transition-colors hover:text-gold lg:justify-end"
+            className="inline-flex max-w-full opacity-85 transition-opacity hover:opacity-100 lg:justify-end"
             aria-label="又拍云联盟"
           >
-            <Image src="/upyun-logo.svg" alt="" width={28} height={28} className="shrink-0" />
-            <span>又拍云联盟</span>
+            <Image
+              src="/upyun-logo.png"
+              alt="又拍云联盟"
+              width={574}
+              height={36}
+              className="h-auto w-[min(287px,100%)]"
+            />
           </a>
         </div>
       </div>
