@@ -43,16 +43,15 @@ export function SiteFooter({ locale, dictionary }: { locale?: Locale; dictionary
             href="https://www.upyun.com/league"
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex max-w-full opacity-85 transition-opacity hover:opacity-100 lg:justify-end"
+            className="inline-flex max-w-full items-center gap-2 text-xs text-ivory/65 transition-colors hover:text-gold lg:justify-end"
             aria-label="又拍云联盟"
           >
-            <Image
-              src="/upyun-logo.png"
-              alt="又拍云联盟"
-              width={574}
-              height={36}
-              className="h-auto w-[min(287px,100%)]"
-            />
+            <span className="whitespace-nowrap">本网站由</span>
+            <span className="inline-flex min-w-0 items-center gap-1.5">
+              <Image src="/upyun-logo.svg" alt="" width={22} height={22} className="shrink-0" />
+              <span className="whitespace-nowrap text-sm font-semibold text-ivory">又拍云</span>
+            </span>
+            <span className="whitespace-nowrap">提供 CDN 加速/云存储服务</span>
           </a>
         </div>
       </div>
