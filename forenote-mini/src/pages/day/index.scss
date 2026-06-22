@@ -1,0 +1,212 @@
+.day {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  background: var(--bg);
+
+  &__header {
+    background: var(--surface);
+    padding: 24px 28px 0;
+    border-bottom: 1px solid var(--divider);
+    flex-shrink: 0;
+  }
+
+  &__titlebar {
+    display: flex;
+    align-items: center;
+    margin-bottom: 16px;
+  }
+
+  &__back {
+    display: flex;
+    align-items: center;
+  }
+
+  &__back-text {
+    font-size: 32px;
+    color: var(--accent);
+    font-weight: 600;
+  }
+
+  &__nav-btn {
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    background: var(--surface-2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 28px;
+    color: var(--accent);
+    font-weight: 600;
+    flex-shrink: 0;
+    margin-left: 20px;
+  }
+
+  &__dateline {
+    display: flex;
+    align-items: baseline;
+    padding: 20px 4px 8px;
+  }
+
+  &__dateline-main {
+    font-size: 40px;
+    font-weight: 700;
+    color: var(--text);
+  }
+
+  &__dateline-week {
+    font-size: 26px;
+    color: var(--text-light);
+    margin-left: 16px;
+  }
+
+  &__weekdays {
+    display: flex;
+    padding: 8px 0;
+  }
+
+  &__weekday {
+    flex: 1;
+    text-align: center;
+    font-size: 22px;
+    color: var(--text-light);
+    font-weight: 600;
+    letter-spacing: 1px;
+
+    &--weekend { color: var(--accent); }
+  }
+
+  &__weekstrip {
+    height: 120px;
+  }
+
+  &__weekitem { height: 100%; }
+
+  &__weekrow {
+    display: flex;
+    height: 100%;
+    align-items: center;
+  }
+
+  &__wcell {
+    flex: 1;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+  }
+
+  &__wcell-num {
+    font-size: 30px;
+    color: var(--text);
+    width: 64px;
+    height: 64px;
+    line-height: 64px;
+    text-align: center;
+    border-radius: 50%;
+  }
+
+  &__wcell--today .day__wcell-num { color: var(--accent); font-weight: 700; }
+
+  &__wcell--active .day__wcell-num {
+    background: var(--primary);
+    color: var(--surface);
+    font-weight: 700;
+  }
+
+  &__wcell-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--accent);
+    margin-top: 6px;
+  }
+
+  &__wcell--active .day__wcell-dot { background: var(--primary); }
+
+  &__days {
+    flex: 1;
+    height: 0;
+  }
+
+  &__dayitem { height: 100%; }
+
+  &__dayscroll {
+    height: 100%;
+    background: var(--bg);
+  }
+
+  &__list { padding: 28px 32px 60px; }
+
+  &__event {
+    display: flex;
+    margin-bottom: 24px;
+  }
+
+  &__time {
+    width: 100px;
+    padding-top: 8px;
+    flex-shrink: 0;
+  }
+
+  &__time-start {
+    font-size: 28px;
+    font-weight: 600;
+    color: var(--text-muted);
+  }
+
+  &__card {
+    flex: 1;
+    display: flex;
+    border-radius: 18px;
+    border-left: 8px solid transparent;
+    overflow: hidden;
+  }
+
+  &__card-cover {
+    width: 150px;
+    height: 150px;
+    flex-shrink: 0;
+  }
+
+  &__card-body {
+    flex: 1;
+    padding: 20px 24px;
+    overflow: hidden;
+  }
+
+  &__card-title {
+    display: block;
+    font-size: 30px;
+    font-weight: 600;
+  }
+
+  &__card-meta {
+    display: block;
+    font-size: 22px;
+    color: var(--text-muted);
+    margin-top: 10px;
+  }
+
+  &__empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 180px 0;
+  }
+
+  &__empty-text {
+    font-size: 30px;
+    color: var(--text-muted);
+    margin-top: 28px;
+  }
+
+  &__empty-hint {
+    font-size: 24px;
+    color: var(--text-faint);
+    margin-top: 14px;
+  }
+}

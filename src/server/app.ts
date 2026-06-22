@@ -7,6 +7,7 @@ import { composersRoute } from "./routes/composers";
 import { worksRoute } from "./routes/works";
 import { performancesRoute } from "./routes/performances";
 import { articlesRoute } from "./routes/articles";
+import { bannersRoute } from "./routes/banners";
 import { meRoute } from "./routes/me";
 
 // The db middleware must be applied BEFORE the routes are mounted — Hono only
@@ -37,6 +38,7 @@ export function createApp(dbMiddleware: MiddlewareHandler<AppEnv>, uploadAvatar:
 
   app.route("/composers", composersRoute);
   app.route("/works", worksRoute);
+  app.route("/banners", bannersRoute);
   app.route("/performances", performancesRoute);
   app.route("/articles", articlesRoute);
   app.route("/me", meRoute);

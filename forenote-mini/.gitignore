@@ -1,0 +1,8 @@
+node_modules/
+dist/
+.swc/
+.DS_Store
+*.log
+.env*
+.idea/
+.vscode/

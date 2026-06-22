@@ -53,6 +53,25 @@ export async function listPerformances(db: AnyDb, dbType: "postgres" | "d1") {
   return (db as D1Db).select().from(sqlite.performances).orderBy(asc(sqlite.performances.startsAt));
 }
 
+export async function listBannerPerformances(db: AnyDb, dbType: "postgres" | "d1", openid: string) {
+  if (dbType === "postgres") {
+    const rows = await (db as PgDb)
+      .select({ perf: pg.performances, createdAt: pg.favorites.createdAt })
+      .from(pg.favorites)
+      .innerJoin(pg.performances, eq(pg.performances.id, pg.favorites.performanceId))
+      .where(eq(pg.favorites.openid, openid))
+      .orderBy(desc(pg.favorites.createdAt));
+    return rows.map((r) => r.perf);
+  }
+  const rows = await (db as D1Db)
+    .select({ perf: sqlite.performances, createdAt: sqlite.favorites.createdAt })
+    .from(sqlite.favorites)
+    .innerJoin(sqlite.performances, eq(sqlite.performances.id, sqlite.favorites.performanceId))
+    .where(eq(sqlite.favorites.openid, openid))
+    .orderBy(desc(sqlite.favorites.createdAt));
+  return rows.map((r) => r.perf);
+}
+
 export async function listArticles(db: AnyDb, dbType: "postgres" | "d1") {
   if (dbType === "postgres") {
     return (db as PgDb).select().from(pg.articles).orderBy(desc(pg.articles.publishedAt));
