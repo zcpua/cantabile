@@ -1,0 +1,6 @@
+[submodule "forenote-mini"]
+	path = forenote-mini
+	url = https://github.com/zcpua/forenote-mini
+[submodule "gin-container"]
+	path = gin-container
+	url = https://github.com/zcpua/gin-container
