@@ -1,4 +1,4 @@
-import { and, asc, count, desc, eq, isNull } from "drizzle-orm";
+import { and, asc, count, desc, eq, isNull, sql } from "drizzle-orm";
 import type { AnyDb, PgDb, D1Db } from "./env";
 import * as pg from "@/db/schema.pg";
 import * as sqlite from "@/db/schema.sqlite";
@@ -254,4 +254,117 @@ export async function removeCollection(
   }
   const t = sqliteTableFor(kind);
   await (db as D1Db).delete(t).where(and(eq(t.openid, openid), eq(t.performanceId, performanceId)));
+}
+
+// --- Notification credits (开票提醒) ---
+//
+// The Hono API mirrors the Gin routes in gin-container. The mini-program
+// speaks to whichever runtime is deployed (WeChat Cloud Run → Gin,
+// Cloudflare Workers → Hono); both hit the same schema.
+
+export async function listCreditIds(
+  db: AnyDb,
+  dbType: "postgres" | "d1",
+  openid: string,
+  kind: string = "on_sale",
+): Promise<string[]> {
+  if (dbType === "postgres") {
+    const rows = await (db as PgDb)
+      .select({ id: pg.notificationCredits.performanceId })
+      .from(pg.notificationCredits)
+      .where(
+        and(
+          eq(pg.notificationCredits.openid, openid),
+          eq(pg.notificationCredits.kind, kind),
+          isNull(pg.notificationCredits.consumedAt),
+          isNull(pg.notificationCredits.failedAt),
+        ),
+      );
+    return rows.map((r) => r.id);
+  }
+  const rows = await (db as D1Db)
+    .select({ id: sqlite.notificationCredits.performanceId })
+    .from(sqlite.notificationCredits)
+    .where(
+      and(
+        eq(sqlite.notificationCredits.openid, openid),
+        eq(sqlite.notificationCredits.kind, kind),
+        isNull(sqlite.notificationCredits.consumedAt),
+        isNull(sqlite.notificationCredits.failedAt),
+      ),
+    );
+  return rows.map((r) => r.id);
+}
+
+// Upsert: a re-tap on "提醒我开票" after a prior push consumed the row
+// re-arms the same primary key rather than blocking. attempts+failedAt
+// get cleared so a previously-failed credit gets a fresh retry budget.
+export async function upsertCredit(
+  db: AnyDb,
+  dbType: "postgres" | "d1",
+  openid: string,
+  performanceId: string,
+  kind: string = "on_sale",
+) {
+  if (dbType === "postgres") {
+    await (db as PgDb)
+      .insert(pg.notificationCredits)
+      .values({ openid, performanceId, kind })
+      .onConflictDoUpdate({
+        target: [
+          pg.notificationCredits.openid,
+          pg.notificationCredits.performanceId,
+          pg.notificationCredits.kind,
+        ],
+        set: {
+          grantedAt: sql`now()`,
+          consumedAt: null,
+          attempts: 0,
+          failedAt: null,
+        },
+      });
+    return;
+  }
+  await (db as D1Db)
+    .insert(sqlite.notificationCredits)
+    .values({ openid, performanceId, kind })
+    .onConflictDoUpdate({
+      target: [
+        sqlite.notificationCredits.openid,
+        sqlite.notificationCredits.performanceId,
+        sqlite.notificationCredits.kind,
+      ],
+      set: {
+        grantedAt: sql`CURRENT_TIMESTAMP`,
+        consumedAt: null,
+        attempts: 0,
+        failedAt: null,
+      },
+    });
+}
+
+export async function removeCredit(
+  db: AnyDb,
+  dbType: "postgres" | "d1",
+  openid: string,
+  performanceId: string,
+  kind: string = "on_sale",
+) {
+  if (dbType === "postgres") {
+    await (db as PgDb).delete(pg.notificationCredits).where(
+      and(
+        eq(pg.notificationCredits.openid, openid),
+        eq(pg.notificationCredits.performanceId, performanceId),
+        eq(pg.notificationCredits.kind, kind),
+      ),
+    );
+    return;
+  }
+  await (db as D1Db).delete(sqlite.notificationCredits).where(
+    and(
+      eq(sqlite.notificationCredits.openid, openid),
+      eq(sqlite.notificationCredits.performanceId, performanceId),
+      eq(sqlite.notificationCredits.kind, kind),
+    ),
+  );
 }

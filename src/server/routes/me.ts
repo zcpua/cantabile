@@ -8,7 +8,10 @@ import {
   findUser,
   listCollection,
   listCollectionPerformances,
+  listCreditIds,
   removeCollection,
+  removeCredit,
+  upsertCredit,
   upsertUser,
 } from "../repository";
 
@@ -111,6 +114,31 @@ export const meRoute = new Hono<AppEnv>()
   })
   .delete("/tickets/:performanceId", async (c) => {
     await removeCollection(c.get("db"), c.get("dbType"), c.get("openid"), c.req.param("performanceId"), "tickets");
+    return c.json({ ok: true });
+  })
+
+  // Notification credits: one per user tap of "提醒我开票". The mini-program
+  // client only ever sends `kind: "on_sale"` for v1; the schema leaves room
+  // to add cancellation alerts later without a route change.
+  .get("/notification-credits/ids", async (c) => {
+    const kind = c.req.query("kind") ?? "on_sale";
+    const ids = await listCreditIds(c.get("db"), c.get("dbType"), c.get("openid"), kind);
+    return c.json({ ids });
+  })
+  .post("/notification-credits/:performanceId", async (c) => {
+    const performanceId = c.req.param("performanceId");
+    const perf = await findPerformanceById(c.get("db"), c.get("dbType"), performanceId);
+    if (!perf) return c.json({ error: "performance not found" }, 404);
+    const body = await c.req.json().catch(() => ({}) as Record<string, unknown>);
+    const kind = typeof body.kind === "string" && body.kind ? body.kind : "on_sale";
+    if (kind !== "on_sale") return c.json({ error: "unsupported kind" }, 400);
+    await upsertUser(c.get("db"), c.get("dbType"), { openid: c.get("openid"), unionid: c.get("unionid") ?? null });
+    await upsertCredit(c.get("db"), c.get("dbType"), c.get("openid"), performanceId, kind);
+    return c.json({ ok: true });
+  })
+  .delete("/notification-credits/:performanceId", async (c) => {
+    const kind = c.req.query("kind") ?? "on_sale";
+    await removeCredit(c.get("db"), c.get("dbType"), c.get("openid"), c.req.param("performanceId"), kind);
     return c.json({ ok: true });
   });
 
