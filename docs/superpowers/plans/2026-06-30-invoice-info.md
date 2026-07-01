@@ -17,7 +17,7 @@
 - **No introduction of `pg_enum`:** keep `sale_state` as `text` so D1/SQLite mirror cleanly. Enum values: `unknown | pre_sale | on_sale | sold_out | cancelled | ended`.
 - **First-insert suppression:** transition log MUST NOT be written on a performance's very first scrape (when `prev_state IS NULL`). This is a correctness requirement, not a style preference — without it every freshly-scraped `on_sale` performance produces a phantom transition.
 - **Kill switch present:** notifier MUST honor `NOTIFIER_ENABLED=false` env var by exiting the loop immediately. No code path may bypass it.
-- **No retroactive pushes:** the deployment must not generate transitions for rows already in `on_sale` at migration time. The migration sets every existing row to `'unknown'`, and the suppression rule then prevents a phantom transition on the next scrape.
+- **No retroactive pushes:** the deployment must not push notifications for transitions logged during phases 1-2 (schema + scraper rollout). This is safe by construction — no `notification_credits` rows exist until the mini-program ships (phase 4). As a belt-and-braces measure, Task 10 Step 4 marks all pre-flip transitions as `notified_at = now()` before enabling the notifier.
 - **Test runner:** `scripts/lib/*.test.mjs` uses `node:test` + `node --test` (Node 20 built-in, zero deps). `gin-container/*_test.go` uses `go test` (stdlib).
 - **WeChat template fields placeholder:** the actual `thing1` / `time2` / `thing3` field IDs depend on the approved 订阅消息 template. Code uses placeholder names matching the spec; real IDs land via env at deploy time and a follow-up patch if the template审批 differs.
 
