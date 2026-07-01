@@ -1,5 +1,5 @@
 import { boolean, index, integer, jsonb, pgTable, primaryKey, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
-import type { Article, Composer, Performance, Work } from "@/data/types";
+import type { Article, Composer, Performance, SaleState, Work } from "@/data/types";
 
 export const composers = pgTable("composers", {
   id: text("id").primaryKey(),
@@ -62,6 +62,7 @@ export const performances = pgTable("performances", {
   imageUrl: text("image_url"),
   priceLabel: text("price_label"),
   saleStatus: text("sale_status"),
+  saleState: text("sale_state").$type<SaleState>().notNull().default("unknown"),
   address: text("address"),
   intro: text("intro"),
   isClassical: boolean("is_classical"),
@@ -73,6 +74,7 @@ export const performances = pgTable("performances", {
   index("performances_starts_at_idx").on(table.startsAt),
   index("performances_city_idx").on(table.city),
   index("performances_venue_idx").on(table.venue),
+  index("performances_sale_state_idx").on(table.saleState),
   uniqueIndex("performances_source_id_unique").on(table.sourceId),
 ]);
 
@@ -121,4 +123,41 @@ export const tickets = pgTable("tickets", {
 }, (table) => [
   primaryKey({ columns: [table.openid, table.performanceId] }),
   index("tickets_openid_idx").on(table.openid),
+]);
+
+// Append-only audit of sale_state changes on performances. Written by the
+// scrapers' upsert helper; consumed by the gin-container notifier ticker.
+// notifiedAt = NULL until the notifier has drained the row.
+export const saleStateTransitions = pgTable("sale_state_transitions", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  performanceId: text("performance_id").notNull().references(() => performances.id, { onDelete: "cascade" }),
+  fromState: text("from_state").notNull(),
+  toState: text("to_state").notNull(),
+  detectedAt: timestamp("detected_at", { withTimezone: true }).notNull().defaultNow(),
+  notifiedAt: timestamp("notified_at", { withTimezone: true }),
+}, (table) => [
+  uniqueIndex("sale_state_transitions_event_unique").on(
+    table.performanceId,
+    table.fromState,
+    table.toState,
+    table.detectedAt,
+  ),
+  index("sale_state_transitions_pending_idx").on(table.toState, table.notifiedAt),
+]);
+
+// One row per user opt-in to a WeChat 订阅消息 notification kind.
+// A single tap by the user creates or re-arms the row (see the upsert path
+// in gin-container). The row is consumed when the notifier successfully
+// pushes; a re-tap after consumption re-arms it.
+export const notificationCredits = pgTable("notification_credits", {
+  openid: text("openid").notNull().references(() => users.openid, { onDelete: "cascade" }),
+  performanceId: text("performance_id").notNull().references(() => performances.id, { onDelete: "cascade" }),
+  kind: text("kind").notNull(),
+  grantedAt: timestamp("granted_at", { withTimezone: true }).notNull().defaultNow(),
+  consumedAt: timestamp("consumed_at", { withTimezone: true }),
+  attempts: integer("attempts").notNull().default(0),
+  failedAt: timestamp("failed_at", { withTimezone: true }),
+}, (table) => [
+  primaryKey({ columns: [table.openid, table.performanceId, table.kind] }),
+  index("notification_credits_pending_idx").on(table.performanceId, table.kind),
 ]);

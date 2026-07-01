@@ -29,6 +29,13 @@
       "when": 1812000001000,
       "tag": "0003_avatar_file_id",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1782887031452,
+      "tag": "0004_sale_state",
+      "breakpoints": true
     }
   ]
 }
