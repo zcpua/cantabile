@@ -2,6 +2,8 @@ import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import postgres from "postgres";
 import { uploadImageToR2 } from "./lib/r2-upload.mjs";
+import { bjchSaleState } from "./lib/sale-state.mjs";
+import { logSaleStateTransition, readCurrentSaleState } from "./lib/sale-state-upsert.mjs";
 
 const root = resolve(new URL("..", import.meta.url).pathname);
 loadEnvFiles([".env", ".env.local"]);
@@ -117,6 +119,7 @@ function normalizeProject(record) {
       imageUrl: optionalText(record.projectImgUrl),
       priceLabel: priceLabel(round.priceList),
       saleStatus: saleStatus(record, round),
+      saleState: bjchSaleState(record, round),
       address: addressFromRound(round),
       intro: optionalText(record.firstClassName),
       isClassical: true,
@@ -127,48 +130,59 @@ function normalizeProject(record) {
 }
 
 async function savePerformance(sql, draft, { updateCore }) {
-  const values = performanceValues(sql, draft);
+  const nextState = draft.saleState ?? "unknown";
+  await sql.begin(async (tx) => {
+    const prevState = await readCurrentSaleState(tx, draft.sourceId);
+    const values = performanceValues(tx, draft);
 
-  if (updateCore) {
-    await sql`
-      insert into public.performances ${sql(values, "id", "title", "city", "venue", "starts_at", "artists", "program", "ticket_url", "source_url", "source_name", "image_url", "price_label", "sale_status", "address", "intro", "is_classical", "source_id", "source_metadata")}
-      on conflict (source_id) do update set
-        title = excluded.title,
-        city = excluded.city,
-        venue = excluded.venue,
-        starts_at = excluded.starts_at,
-        artists = excluded.artists,
-        program = excluded.program,
-        ticket_url = excluded.ticket_url,
-        source_url = excluded.source_url,
-        source_name = excluded.source_name,
-        image_url = excluded.image_url,
-        price_label = excluded.price_label,
-        sale_status = excluded.sale_status,
-        address = excluded.address,
-        intro = excluded.intro,
-        is_classical = excluded.is_classical,
-        source_metadata = excluded.source_metadata,
-        updated_at = now()
-    `;
-    return;
-  }
+    let rows;
+    if (updateCore) {
+      rows = await tx`
+        insert into public.performances ${tx(values, "id", "title", "city", "venue", "starts_at", "artists", "program", "ticket_url", "source_url", "source_name", "image_url", "price_label", "sale_status", "sale_state", "address", "intro", "is_classical", "source_id", "source_metadata")}
+        on conflict (source_id) do update set
+          title = excluded.title,
+          city = excluded.city,
+          venue = excluded.venue,
+          starts_at = excluded.starts_at,
+          artists = excluded.artists,
+          program = excluded.program,
+          ticket_url = excluded.ticket_url,
+          source_url = excluded.source_url,
+          source_name = excluded.source_name,
+          image_url = excluded.image_url,
+          price_label = excluded.price_label,
+          sale_status = excluded.sale_status,
+          sale_state = excluded.sale_state,
+          address = excluded.address,
+          intro = excluded.intro,
+          is_classical = excluded.is_classical,
+          source_metadata = excluded.source_metadata,
+          updated_at = now()
+        returning id
+      `;
+    } else {
+      rows = await tx`
+        insert into public.performances ${tx(values, "id", "title", "city", "venue", "starts_at", "artists", "program", "ticket_url", "source_url", "source_name", "image_url", "price_label", "sale_status", "sale_state", "address", "intro", "is_classical", "source_id", "source_metadata")}
+        on conflict (source_id) do update set
+          ticket_url = excluded.ticket_url,
+          source_url = excluded.source_url,
+          source_name = excluded.source_name,
+          image_url = excluded.image_url,
+          price_label = excluded.price_label,
+          sale_status = excluded.sale_status,
+          sale_state = excluded.sale_state,
+          address = excluded.address,
+          intro = excluded.intro,
+          is_classical = excluded.is_classical,
+          source_metadata = excluded.source_metadata,
+          updated_at = now()
+        returning id
+      `;
+    }
 
-  await sql`
-    insert into public.performances ${sql(values, "id", "title", "city", "venue", "starts_at", "artists", "program", "ticket_url", "source_url", "source_name", "image_url", "price_label", "sale_status", "address", "intro", "is_classical", "source_id", "source_metadata")}
-    on conflict (source_id) do update set
-      ticket_url = excluded.ticket_url,
-      source_url = excluded.source_url,
-      source_name = excluded.source_name,
-      image_url = excluded.image_url,
-      price_label = excluded.price_label,
-      sale_status = excluded.sale_status,
-      address = excluded.address,
-      intro = excluded.intro,
-      is_classical = excluded.is_classical,
-      source_metadata = excluded.source_metadata,
-      updated_at = now()
-  `;
+    const id = rows[0]?.id;
+    if (id) await logSaleStateTransition(tx, id, prevState, nextState);
+  });
 }
 
 function performanceValues(sql, draft) {
@@ -186,6 +200,7 @@ function performanceValues(sql, draft) {
     image_url: nullish(draft.imageUrl),
     price_label: nullish(draft.priceLabel),
     sale_status: nullish(draft.saleStatus),
+    sale_state: draft.saleState ?? "unknown",
     address: nullish(draft.address),
     intro: nullish(draft.intro),
     is_classical: draft.isClassical,
