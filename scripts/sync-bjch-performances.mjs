@@ -178,13 +178,15 @@ function enrichDraftWithDetail(draft, detail) {
     intro: htmlToText(detail.projectIntroduce) ?? draft.intro,
     sourceMetadata: compactRecord({
       ...draft.sourceMetadata,
-      detail,
       firstClassId: detail.firstClassId,
       firstClassName: detail.firstClassName,
       secondClassId: detail.secondClassId,
       secondClassName: detail.secondClassName,
+      detailProjectId: detail.projectId,
+      detailProjectSaleState: detail.projectSaleState,
       projectSeatType: detail.projectSeatType,
       projectWatchingNotice: htmlToText(detail.projectWatchingNotice),
+      sponsorInfoList: detail.sponsorInfoList,
     }),
   };
 }
