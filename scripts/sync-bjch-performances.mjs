@@ -10,6 +10,7 @@ loadEnvFiles([".env", ".env.local"]);
 
 const sourceName = "BJCH";
 const listEndpoint = "https://www.bjconcerthall.cn/yjzd-webapp/api/project/list";
+const detailEndpoint = "https://www.bjconcerthall.cn/yjzd-webapp/api/project/detail";
 const detailBaseUrl = "https://www.bjconcerthall.cn/bjyyt/ycgp/ycgpxq.shtml";
 const defaultPageSize = 20;
 
@@ -54,7 +55,9 @@ async function loadDrafts(options) {
   }
 
   const limitedRecords = options.limit ? records.slice(0, options.limit) : records;
-  return limitedRecords.flatMap(normalizeProject).sort((a, b) => a.startsAt.localeCompare(b.startsAt));
+  const drafts = limitedRecords.flatMap(normalizeProject);
+  const details = await fetchProjectDetails(drafts);
+  return drafts.map((draft) => enrichDraftWithDetail(draft, details.get(draft.sourceMetadata?.projectId))).sort((a, b) => a.startsAt.localeCompare(b.startsAt));
 }
 
 async function fetchProjectPage(page, pageSize) {
@@ -92,6 +95,42 @@ async function fetchWithRetry(url, options, attempts = 3) {
   return lastResponse;
 }
 
+async function fetchProjectDetails(drafts) {
+  const details = new Map();
+  const seenProjectIds = new Set();
+
+  for (const draft of drafts) {
+    const projectId = draft.sourceMetadata?.projectId;
+    const eventId = draft.sourceMetadata?.eventId;
+    if (!projectId || !eventId || seenProjectIds.has(projectId)) continue;
+    seenProjectIds.add(projectId);
+    details.set(projectId, await fetchProjectDetail(projectId, eventId, draft.sourceUrl));
+  }
+
+  return details;
+}
+
+async function fetchProjectDetail(projectId, eventId, referer) {
+  const url = new URL(detailEndpoint);
+  url.search = new URLSearchParams({
+    projectId,
+    eventId,
+  }).toString();
+
+  const response = await fetchWithRetry(url, {
+    headers: {
+      "accept": "application/json, text/plain, */*",
+      "referer": referer,
+      "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+    },
+  });
+
+  if (!response.ok) throw new Error(`BJCH detail request failed: ${response.status} ${response.statusText}`);
+  const payload = await response.json();
+  if (payload.code !== 200) throw new Error(`BJCH detail request failed: ${payload.msg ?? JSON.stringify(payload)}`);
+  return payload.data ?? {};
+}
+
 function normalizeProject(record) {
   const projectId = text(record.projectId);
   const title = text(record.projectName ?? `BJCH ${projectId}`);
@@ -121,12 +160,33 @@ function normalizeProject(record) {
       saleStatus: saleStatus(record, round),
       saleState: bjchSaleState(record, round),
       address: addressFromRound(round),
-      intro: optionalText(record.firstClassName),
+      intro: htmlToText(record.projectIntroduce),
       isClassical: true,
       sourceId: `bjch:${projectId}:${eventId}`,
       sourceMetadata: compactRecord({ projectId, eventId, list: record, round, fetchedAt: new Date().toISOString() }),
     }];
   });
+}
+
+function enrichDraftWithDetail(draft, detail) {
+  if (!detail) return draft;
+
+  return {
+    ...draft,
+    title: text(detail.projectName) || draft.title,
+    imageUrl: optionalText(detail.projectImgUrl) ?? draft.imageUrl,
+    intro: htmlToText(detail.projectIntroduce) ?? draft.intro,
+    sourceMetadata: compactRecord({
+      ...draft.sourceMetadata,
+      detail,
+      firstClassId: detail.firstClassId,
+      firstClassName: detail.firstClassName,
+      secondClassId: detail.secondClassId,
+      secondClassName: detail.secondClassName,
+      projectSeatType: detail.projectSeatType,
+      projectWatchingNotice: htmlToText(detail.projectWatchingNotice),
+    }),
+  };
 }
 
 async function savePerformance(sql, draft, { updateCore }) {
@@ -253,6 +313,30 @@ function normalizeVenue(value) {
   const venue = text(value);
   if (!venue) return "北京音乐厅";
   return venue.replace(/1\.0$/, "");
+}
+
+function htmlToText(value) {
+  const html = String(value ?? "").trim();
+  if (!html) return undefined;
+
+  const normalized = html
+    .replace(/<script[\s\S]*?<\/script>/gi, " ")
+    .replace(/<style[\s\S]*?<\/style>/gi, " ")
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/(p|div|section|article|li|tr|h[1-6])>/gi, "\n")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(/&quot;/gi, "\"")
+    .replace(/&#39;/g, "'")
+    .replace(/[ \t\f\v]+/g, " ")
+    .replace(/\s*\n\s*/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+
+  return normalized || undefined;
 }
 
 function toIsoDate(value) {
