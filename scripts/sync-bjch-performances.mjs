@@ -170,14 +170,22 @@ function normalizeProject(record) {
 
 function enrichDraftWithDetail(draft, detail) {
   if (!detail) return draft;
+  const introHtml = detail.projectIntroduce ?? "";
+  const introText = htmlToText(introHtml);
+  const artists = extractArtistsFromIntro(introText);
+  const program = extractProgramFromIntro(introText, draft.title);
+  const introImages = htmlImageUrls(introHtml);
 
   return {
     ...draft,
     title: text(detail.projectName) || draft.title,
     imageUrl: optionalText(detail.projectImgUrl) ?? draft.imageUrl,
-    intro: htmlToText(detail.projectIntroduce) ?? draft.intro,
+    intro: introText ?? draft.intro,
+    artists: artists.length ? artists : draft.artists,
+    program: program.length ? program : draft.program,
     sourceMetadata: compactRecord({
       ...draft.sourceMetadata,
+      introImages,
       firstClassId: detail.firstClassId,
       firstClassName: detail.firstClassName,
       secondClassId: detail.secondClassId,
@@ -317,6 +325,125 @@ function normalizeVenue(value) {
   return venue.replace(/1\.0$/, "");
 }
 
+function extractArtistsFromIntro(intro) {
+  const lines = introLines(intro);
+  const artists = [];
+  let inArtistBlock = false;
+  const roleKeywords = new Set([
+    "演出单位", "演出", "主演", "主唱", "演唱", "指挥", "钢琴", "小提琴", "中提琴", "大提琴", "低音提琴",
+    "长笛", "短笛", "单簧管", "双簧管", "巴松", "圆号", "小号", "长号", "打击乐", "竖琴",
+    "乐队首席", "主持人", "合唱", "合唱团", "乐团", "女高音", "女中音", "男高音", "男中音", "男低音",
+  ]);
+
+  for (const line of lines) {
+    if (/^(【)?(曲目|曲目介绍|演出曲目)(】)?$/.test(line)) inArtistBlock = false;
+    if (/^(演出阵容|成员|【阵容介绍】|阵容介绍)[:：]?$/.test(line)) {
+      inArtistBlock = true;
+      continue;
+    }
+
+    const keyed = line.match(/^([^：:]{1,12})[：:]\s*(.+)$/);
+    if (keyed) {
+      const role = keyed[1].trim();
+      const value = keyed[2].trim();
+      if (roleKeywords.has(role) && value && !looksLikeMetadataValue(value)) {
+        pushRoleArtists(artists, role, value);
+      }
+      continue;
+    }
+
+    const dashed = line.match(/^(.{2,80}?)[—-]{2,}\s*(.+)$/);
+    if (inArtistBlock && dashed && !/中场休息|Intermission/i.test(line)) {
+      const name = dashed[1].trim();
+      const role = dashed[2].trim();
+      if (name && role && !looksLikeMetadataValue(name)) {
+        artists.push(`${role}：${name}`);
+      }
+    }
+  }
+
+  return unique(artists).slice(0, 24);
+}
+
+function pushRoleArtists(artists, role, value) {
+  const cleaned = value.replace(/（演员按.*?）/g, "").trim();
+  const parts = cleaned
+    .split(/[、，,；;]\s*|\s{2,}|(?<=[\u4e00-\u9fa5])\s+(?=[\u4e00-\u9fa5])/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+  const values = shouldSplitRole(role, parts) ? parts : [cleaned];
+
+  for (const item of values) {
+    if (!item || looksLikeMetadataValue(item)) continue;
+    artists.push(`${role}：${item}`);
+  }
+}
+
+function shouldSplitRole(role, parts) {
+  if (parts.length <= 1) return false;
+  return !["演出", "演出单位"].includes(role);
+}
+
+function looksLikeMetadataValue(value) {
+  return /^(20\d{2}|票价|地点|演出时间|演出日期|演出地点|本场|请|如需|由于|进入剧场|观众)/.test(value) || /\d{1,2}:\d{2}/.test(value);
+}
+
+function extractProgramFromIntro(intro, fallbackTitle) {
+  const lines = introLines(intro);
+  const start = lines.findIndex((line) => /^(【)?(曲目|曲目介绍|演出曲目)(】)?$/.test(line));
+  if (start < 0) return [];
+
+  const programLines = [];
+  for (const line of lines.slice(start + 1)) {
+    if (/^(【)?(阵容介绍|演出阵容|艺术家介绍|成员|主演|演出信息)(】)?/.test(line)) break;
+    if (/^\*?演出曲目.*(现场|当天|为准)/.test(line)) break;
+    if (/^(本场|1\.2米|注[:：])/.test(line)) break;
+    if (/^(—|-)+\s*(中场休息|Intermission)/i.test(line)) continue;
+    if (line) programLines.push(line);
+  }
+
+  const entries = [];
+  for (let index = 0; index < programLines.length; index += 1) {
+    const line = programLines[index];
+    const next = programLines[index + 1];
+    if (looksLikeComposerLine(line) && next && !looksLikeComposerLine(next)) {
+      const parts = [next];
+      while (programLines[index + 2] && (looksLikeProgramContinuation(programLines[index + 2], parts[parts.length - 1]) || looksLikeProgramContinuationForComposer(line, programLines[index + 2]))) {
+        parts.push(programLines[index + 2]);
+        index += 1;
+      }
+      entries.push({ displayTitle: `${line}：${parts.join(" ")}` });
+      index += 1;
+    } else {
+      entries.push({ displayTitle: line });
+    }
+  }
+
+  return uniqueBy(entries, (item) => item.displayTitle).filter((item) => item.displayTitle !== fallbackTitle).slice(0, 40);
+}
+
+function looksLikeComposerLine(line) {
+  if (/[《》:：]/.test(line)) return false;
+  if (/^(中场休息|Intermission)$/i.test(line)) return false;
+  if (/(交响曲|协奏曲|奏鸣曲|组曲|序曲|作品|小调|大调|major|minor)/i.test(line)) return false;
+  return line.length <= 28;
+}
+
+function looksLikeProgramContinuation(line, previous) {
+  return /^(第[一二三四五六七八九十\d]+|选自|作品|Op\.|Act\b)/i.test(line) || (/选段$/.test(line) && /作品|交响曲|协奏曲|组曲/.test(previous));
+}
+
+function looksLikeProgramContinuationForComposer(composer, line) {
+  return composer.length <= 8 && /^(第[一二三四五六七八九十\d]+|[a-z]\s*小调|[A-G]\s*major|[A-G]\s*minor)/i.test(line);
+}
+
+function introLines(intro) {
+  return String(intro ?? "")
+    .split(/\r?\n/)
+    .map((line) => decodeHtmlEntities(line).replace(/\s+/g, " ").trim())
+    .filter(Boolean);
+}
+
 function htmlToText(value) {
   const html = String(value ?? "").trim();
   if (!html) return undefined;
@@ -338,7 +465,51 @@ function htmlToText(value) {
     .replace(/\n{3,}/g, "\n\n")
     .trim();
 
-  return normalized || undefined;
+  return decodeHtmlEntities(normalized) || undefined;
+}
+
+function htmlImageUrls(value) {
+  const html = String(value ?? "");
+  return unique([...html.matchAll(/<img[^>]+src=["']?([^"'\s>]+)/gi)].map((match) => decodeHtmlEntities(match[1]).trim()).filter(Boolean));
+}
+
+function decodeHtmlEntities(value) {
+  return String(value ?? "")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(/&quot;/gi, "\"")
+    .replace(/&#39;|&apos;/gi, "'")
+    .replace(/&mdash;/gi, "——")
+    .replace(/&ndash;/gi, "–")
+    .replace(/&middot;/gi, "·")
+    .replace(/&ldquo;|&rdquo;/gi, "\"")
+    .replace(/&lsquo;|&rsquo;/gi, "'")
+    .replace(/&eacute;/gi, "é")
+    .replace(/&egrave;/gi, "è")
+    .replace(/&acirc;/gi, "â")
+    .replace(/&iuml;/gi, "ï")
+    .replace(/&aacute;/gi, "á")
+    .replace(/&agrave;/gi, "à")
+    .replace(/&uuml;/gi, "ü")
+    .replace(/&szlig;/gi, "ß")
+    .replace(/&#(\d+);/g, (_, code) => String.fromCodePoint(Number(code)))
+    .replace(/&#x([0-9a-f]+);/gi, (_, code) => String.fromCodePoint(parseInt(code, 16)));
+}
+
+function unique(values) {
+  return [...new Set(values)];
+}
+
+function uniqueBy(values, key) {
+  const seen = new Set();
+  return values.filter((value) => {
+    const id = key(value);
+    if (seen.has(id)) return false;
+    seen.add(id);
+    return true;
+  });
 }
 
 function toIsoDate(value) {
