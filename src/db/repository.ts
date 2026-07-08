@@ -202,6 +202,7 @@ function mapPerformanceRow(row: PerformanceRow): Performance {
     imageUrl: row.imageUrl ?? undefined,
     priceLabel: row.priceLabel ?? undefined,
     saleStatus: row.saleStatus ?? undefined,
+    saleState: (row as { saleState?: string }).saleState as Performance["saleState"] | undefined,
     address: row.address ?? undefined,
     intro: row.intro ?? undefined,
     isClassical: row.isClassical ?? undefined,

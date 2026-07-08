@@ -1,6 +1,6 @@
 import { sql } from "drizzle-orm";
 import { index, integer, primaryKey, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
-import type { Article, Composer, Performance, Work } from "@/data/types";
+import type { Article, Composer, Performance, SaleState, Work } from "@/data/types";
 
 export const composers = sqliteTable("composers", {
   id: text("id").primaryKey(),
@@ -63,6 +63,7 @@ export const performances = sqliteTable("performances", {
   imageUrl: text("image_url"),
   priceLabel: text("price_label"),
   saleStatus: text("sale_status"),
+  saleState: text("sale_state").$type<SaleState>().notNull().default("unknown"),
   address: text("address"),
   intro: text("intro"),
   isClassical: integer("is_classical", { mode: "boolean" }),
@@ -74,6 +75,7 @@ export const performances = sqliteTable("performances", {
   index("performances_starts_at_idx").on(table.startsAt),
   index("performances_city_idx").on(table.city),
   index("performances_venue_idx").on(table.venue),
+  index("performances_sale_state_idx").on(table.saleState),
   uniqueIndex("performances_source_id_unique").on(table.sourceId),
 ]);
 
@@ -122,4 +124,34 @@ export const tickets = sqliteTable("tickets", {
 }, (table) => [
   primaryKey({ columns: [table.openid, table.performanceId] }),
   index("tickets_openid_idx").on(table.openid),
+]);
+
+export const saleStateTransitions = sqliteTable("sale_state_transitions", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  performanceId: text("performance_id").notNull().references(() => performances.id, { onDelete: "cascade" }),
+  fromState: text("from_state").notNull(),
+  toState: text("to_state").notNull(),
+  detectedAt: text("detected_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  notifiedAt: text("notified_at"),
+}, (table) => [
+  uniqueIndex("sale_state_transitions_event_unique").on(
+    table.performanceId,
+    table.fromState,
+    table.toState,
+    table.detectedAt,
+  ),
+  index("sale_state_transitions_pending_idx").on(table.toState, table.notifiedAt),
+]);
+
+export const notificationCredits = sqliteTable("notification_credits", {
+  openid: text("openid").notNull().references(() => users.openid, { onDelete: "cascade" }),
+  performanceId: text("performance_id").notNull().references(() => performances.id, { onDelete: "cascade" }),
+  kind: text("kind").notNull(),
+  grantedAt: text("granted_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  consumedAt: text("consumed_at"),
+  attempts: integer("attempts").notNull().default(0),
+  failedAt: text("failed_at"),
+}, (table) => [
+  primaryKey({ columns: [table.openid, table.performanceId, table.kind] }),
+  index("notification_credits_pending_idx").on(table.performanceId, table.kind),
 ]);

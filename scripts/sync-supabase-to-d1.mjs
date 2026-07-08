@@ -18,7 +18,7 @@ try {
   const [composers, works, performances, articles] = await Promise.all([
     sql`select id, slug, name, name_cn, birth_year, death_year, country, period, portrait_url, short_bio, bio, style_tags, timeline, starter_work_ids, related_composer_ids, featured from public.composers order by birth_year asc`,
     sql`select id, slug, composer_id, title, title_cn, year, genre, period, description, movements, listening_links, featured from public.works order by year is null, year asc`,
-    sql`select id, title, city, venue, starts_at, artists, program, ticket_url, source_url, source_name, image_url, price_label, sale_status, address, intro, is_classical, source_id, source_metadata from public.performances order by starts_at asc`,
+    sql`select id, title, city, venue, starts_at, artists, program, ticket_url, source_url, source_name, image_url, price_label, sale_status, sale_state, address, intro, is_classical, source_id, source_metadata from public.performances order by starts_at asc`,
     sql`select id, slug, title, excerpt, cover_url, category, published_at, content, related_composer_ids, related_work_ids from public.articles order by published_at desc`,
   ]);
 
@@ -60,7 +60,7 @@ try {
       listening_links: sqliteJsonValue(work.listening_links),
       featured: sqliteValue(Boolean(work.featured)),
     })),
-    insertStatement("performances", ["id", "title", "city", "venue", "starts_at", "artists", "program", "ticket_url", "source_url", "source_name", "image_url", "price_label", "sale_status", "address", "intro", "is_classical", "source_id", "source_metadata"], performances, (performance) => ({
+    insertStatement("performances", ["id", "title", "city", "venue", "starts_at", "artists", "program", "ticket_url", "source_url", "source_name", "image_url", "price_label", "sale_status", "sale_state", "address", "intro", "is_classical", "source_id", "source_metadata"], performances, (performance) => ({
       id: sqliteValue(performance.id),
       title: sqliteValue(performance.title),
       city: sqliteValue(performance.city),
@@ -74,6 +74,7 @@ try {
       image_url: sqliteValue(performance.image_url),
       price_label: sqliteValue(performance.price_label),
       sale_status: sqliteValue(performance.sale_status),
+      sale_state: sqliteValue(performance.sale_state ?? "unknown"),
       address: sqliteValue(performance.address),
       intro: sqliteValue(performance.intro),
       is_classical: sqliteValue(performance.is_classical),

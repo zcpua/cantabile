@@ -2,12 +2,15 @@ import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import postgres from "postgres";
 import { uploadImageToR2 } from "./lib/r2-upload.mjs";
+import { bjchSaleState } from "./lib/sale-state.mjs";
+import { logSaleStateTransition, readCurrentSaleState } from "./lib/sale-state-upsert.mjs";
 
 const root = resolve(new URL("..", import.meta.url).pathname);
 loadEnvFiles([".env", ".env.local"]);
 
 const sourceName = "BJCH";
 const listEndpoint = "https://www.bjconcerthall.cn/yjzd-webapp/api/project/list";
+const detailEndpoint = "https://www.bjconcerthall.cn/yjzd-webapp/api/project/detail";
 const detailBaseUrl = "https://www.bjconcerthall.cn/bjyyt/ycgp/ycgpxq.shtml";
 const defaultPageSize = 20;
 
@@ -52,7 +55,9 @@ async function loadDrafts(options) {
   }
 
   const limitedRecords = options.limit ? records.slice(0, options.limit) : records;
-  return limitedRecords.flatMap(normalizeProject).sort((a, b) => a.startsAt.localeCompare(b.startsAt));
+  const drafts = limitedRecords.flatMap(normalizeProject);
+  const details = await fetchProjectDetails(drafts);
+  return drafts.map((draft) => enrichDraftWithDetail(draft, details.get(draft.sourceMetadata?.projectId))).sort((a, b) => a.startsAt.localeCompare(b.startsAt));
 }
 
 async function fetchProjectPage(page, pageSize) {
@@ -90,6 +95,42 @@ async function fetchWithRetry(url, options, attempts = 3) {
   return lastResponse;
 }
 
+async function fetchProjectDetails(drafts) {
+  const details = new Map();
+  const seenProjectIds = new Set();
+
+  for (const draft of drafts) {
+    const projectId = draft.sourceMetadata?.projectId;
+    const eventId = draft.sourceMetadata?.eventId;
+    if (!projectId || !eventId || seenProjectIds.has(projectId)) continue;
+    seenProjectIds.add(projectId);
+    details.set(projectId, await fetchProjectDetail(projectId, eventId, draft.sourceUrl));
+  }
+
+  return details;
+}
+
+async function fetchProjectDetail(projectId, eventId, referer) {
+  const url = new URL(detailEndpoint);
+  url.search = new URLSearchParams({
+    projectId,
+    eventId,
+  }).toString();
+
+  const response = await fetchWithRetry(url, {
+    headers: {
+      "accept": "application/json, text/plain, */*",
+      "referer": referer,
+      "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+    },
+  });
+
+  if (!response.ok) throw new Error(`BJCH detail request failed: ${response.status} ${response.statusText}`);
+  const payload = await response.json();
+  if (payload.code !== 200) throw new Error(`BJCH detail request failed: ${payload.msg ?? JSON.stringify(payload)}`);
+  return payload.data ?? {};
+}
+
 function normalizeProject(record) {
   const projectId = text(record.projectId);
   const title = text(record.projectName ?? `BJCH ${projectId}`);
@@ -117,8 +158,9 @@ function normalizeProject(record) {
       imageUrl: optionalText(record.projectImgUrl),
       priceLabel: priceLabel(round.priceList),
       saleStatus: saleStatus(record, round),
+      saleState: bjchSaleState(record, round),
       address: addressFromRound(round),
-      intro: optionalText(record.firstClassName),
+      intro: htmlToText(record.projectIntroduce),
       isClassical: true,
       sourceId: `bjch:${projectId}:${eventId}`,
       sourceMetadata: compactRecord({ projectId, eventId, list: record, round, fetchedAt: new Date().toISOString() }),
@@ -126,49 +168,91 @@ function normalizeProject(record) {
   });
 }
 
+function enrichDraftWithDetail(draft, detail) {
+  if (!detail) return draft;
+  const introHtml = detail.projectIntroduce ?? "";
+  const introText = htmlToText(introHtml);
+  const artists = extractArtistsFromIntro(introText);
+  const program = extractProgramFromIntro(introText, draft.title);
+  const introImages = htmlImageUrls(introHtml);
+
+  return {
+    ...draft,
+    title: text(detail.projectName) || draft.title,
+    imageUrl: optionalText(detail.projectImgUrl) ?? draft.imageUrl,
+    intro: introText ?? draft.intro,
+    artists: artists.length ? artists : draft.artists,
+    program: program.length ? program : draft.program,
+    sourceMetadata: compactRecord({
+      ...draft.sourceMetadata,
+      introImages,
+      firstClassId: detail.firstClassId,
+      firstClassName: detail.firstClassName,
+      secondClassId: detail.secondClassId,
+      secondClassName: detail.secondClassName,
+      detailProjectId: detail.projectId,
+      detailProjectSaleState: detail.projectSaleState,
+      projectSeatType: detail.projectSeatType,
+      projectWatchingNotice: htmlToText(detail.projectWatchingNotice),
+      sponsorInfoList: detail.sponsorInfoList,
+    }),
+  };
+}
+
 async function savePerformance(sql, draft, { updateCore }) {
-  const values = performanceValues(sql, draft);
+  const nextState = draft.saleState ?? "unknown";
+  await sql.begin(async (tx) => {
+    const prevState = await readCurrentSaleState(tx, draft.sourceId);
+    const values = performanceValues(tx, draft);
 
-  if (updateCore) {
-    await sql`
-      insert into public.performances ${sql(values, "id", "title", "city", "venue", "starts_at", "artists", "program", "ticket_url", "source_url", "source_name", "image_url", "price_label", "sale_status", "address", "intro", "is_classical", "source_id", "source_metadata")}
-      on conflict (source_id) do update set
-        title = excluded.title,
-        city = excluded.city,
-        venue = excluded.venue,
-        starts_at = excluded.starts_at,
-        artists = excluded.artists,
-        program = excluded.program,
-        ticket_url = excluded.ticket_url,
-        source_url = excluded.source_url,
-        source_name = excluded.source_name,
-        image_url = excluded.image_url,
-        price_label = excluded.price_label,
-        sale_status = excluded.sale_status,
-        address = excluded.address,
-        intro = excluded.intro,
-        is_classical = excluded.is_classical,
-        source_metadata = excluded.source_metadata,
-        updated_at = now()
-    `;
-    return;
-  }
+    let rows;
+    if (updateCore) {
+      rows = await tx`
+        insert into public.performances ${tx(values, "id", "title", "city", "venue", "starts_at", "artists", "program", "ticket_url", "source_url", "source_name", "image_url", "price_label", "sale_status", "sale_state", "address", "intro", "is_classical", "source_id", "source_metadata")}
+        on conflict (source_id) do update set
+          title = excluded.title,
+          city = excluded.city,
+          venue = excluded.venue,
+          starts_at = excluded.starts_at,
+          artists = excluded.artists,
+          program = excluded.program,
+          ticket_url = excluded.ticket_url,
+          source_url = excluded.source_url,
+          source_name = excluded.source_name,
+          image_url = excluded.image_url,
+          price_label = excluded.price_label,
+          sale_status = excluded.sale_status,
+          sale_state = excluded.sale_state,
+          address = excluded.address,
+          intro = excluded.intro,
+          is_classical = excluded.is_classical,
+          source_metadata = excluded.source_metadata,
+          updated_at = now()
+        returning id
+      `;
+    } else {
+      rows = await tx`
+        insert into public.performances ${tx(values, "id", "title", "city", "venue", "starts_at", "artists", "program", "ticket_url", "source_url", "source_name", "image_url", "price_label", "sale_status", "sale_state", "address", "intro", "is_classical", "source_id", "source_metadata")}
+        on conflict (source_id) do update set
+          ticket_url = excluded.ticket_url,
+          source_url = excluded.source_url,
+          source_name = excluded.source_name,
+          image_url = excluded.image_url,
+          price_label = excluded.price_label,
+          sale_status = excluded.sale_status,
+          sale_state = excluded.sale_state,
+          address = excluded.address,
+          intro = excluded.intro,
+          is_classical = excluded.is_classical,
+          source_metadata = excluded.source_metadata,
+          updated_at = now()
+        returning id
+      `;
+    }
 
-  await sql`
-    insert into public.performances ${sql(values, "id", "title", "city", "venue", "starts_at", "artists", "program", "ticket_url", "source_url", "source_name", "image_url", "price_label", "sale_status", "address", "intro", "is_classical", "source_id", "source_metadata")}
-    on conflict (source_id) do update set
-      ticket_url = excluded.ticket_url,
-      source_url = excluded.source_url,
-      source_name = excluded.source_name,
-      image_url = excluded.image_url,
-      price_label = excluded.price_label,
-      sale_status = excluded.sale_status,
-      address = excluded.address,
-      intro = excluded.intro,
-      is_classical = excluded.is_classical,
-      source_metadata = excluded.source_metadata,
-      updated_at = now()
-  `;
+    const id = rows[0]?.id;
+    if (id) await logSaleStateTransition(tx, id, prevState, nextState);
+  });
 }
 
 function performanceValues(sql, draft) {
@@ -186,6 +270,7 @@ function performanceValues(sql, draft) {
     image_url: nullish(draft.imageUrl),
     price_label: nullish(draft.priceLabel),
     sale_status: nullish(draft.saleStatus),
+    sale_state: draft.saleState ?? "unknown",
     address: nullish(draft.address),
     intro: nullish(draft.intro),
     is_classical: draft.isClassical,
@@ -238,6 +323,193 @@ function normalizeVenue(value) {
   const venue = text(value);
   if (!venue) return "北京音乐厅";
   return venue.replace(/1\.0$/, "");
+}
+
+function extractArtistsFromIntro(intro) {
+  const lines = introLines(intro);
+  const artists = [];
+  let inArtistBlock = false;
+  const roleKeywords = new Set([
+    "演出单位", "演出", "主演", "主唱", "演唱", "指挥", "钢琴", "小提琴", "中提琴", "大提琴", "低音提琴",
+    "长笛", "短笛", "单簧管", "双簧管", "巴松", "圆号", "小号", "长号", "打击乐", "竖琴",
+    "乐队首席", "主持人", "合唱", "合唱团", "乐团", "女高音", "女中音", "男高音", "男中音", "男低音",
+  ]);
+
+  for (const line of lines) {
+    if (/^(【)?(曲目|曲目介绍|演出曲目)(】)?$/.test(line)) inArtistBlock = false;
+    if (/^(演出阵容|成员|【阵容介绍】|阵容介绍)[:：]?$/.test(line)) {
+      inArtistBlock = true;
+      continue;
+    }
+
+    const keyed = line.match(/^([^：:]{1,12})[：:]\s*(.+)$/);
+    if (keyed) {
+      const role = keyed[1].trim();
+      const value = keyed[2].trim();
+      if (roleKeywords.has(role) && value && !looksLikeMetadataValue(value)) {
+        pushRoleArtists(artists, role, value);
+      }
+      continue;
+    }
+
+    const dashed = line.match(/^(.{2,80}?)[—-]{2,}\s*(.+)$/);
+    if (inArtistBlock && dashed && !/中场休息|Intermission/i.test(line)) {
+      const name = dashed[1].trim();
+      const role = dashed[2].trim();
+      if (name && role && !looksLikeMetadataValue(name)) {
+        artists.push(`${role}：${name}`);
+      }
+    }
+  }
+
+  return unique(artists).slice(0, 24);
+}
+
+function pushRoleArtists(artists, role, value) {
+  const cleaned = value.replace(/（演员按.*?）/g, "").trim();
+  const parts = cleaned
+    .split(/[、，,；;]\s*|\s{2,}|(?<=[\u4e00-\u9fa5])\s+(?=[\u4e00-\u9fa5])/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+  const values = shouldSplitRole(role, parts) ? parts : [cleaned];
+
+  for (const item of values) {
+    if (!item || looksLikeMetadataValue(item)) continue;
+    artists.push(`${role}：${item}`);
+  }
+}
+
+function shouldSplitRole(role, parts) {
+  if (parts.length <= 1) return false;
+  return !["演出", "演出单位"].includes(role);
+}
+
+function looksLikeMetadataValue(value) {
+  return /^(20\d{2}|票价|地点|演出时间|演出日期|演出地点|本场|请|如需|由于|进入剧场|观众)/.test(value) || /\d{1,2}:\d{2}/.test(value);
+}
+
+function extractProgramFromIntro(intro, fallbackTitle) {
+  const lines = introLines(intro);
+  const start = lines.findIndex((line) => /^(【)?(曲目|曲目介绍|演出曲目)(】)?$/.test(line));
+  if (start < 0) return [];
+
+  const programLines = [];
+  for (const line of lines.slice(start + 1)) {
+    if (/^(【)?(阵容介绍|演出阵容|艺术家介绍|成员|主演|演出信息)(】)?/.test(line)) break;
+    if (/^\*?演出曲目.*(现场|当天|为准)/.test(line)) break;
+    if (/^(本场|1\.2米|注[:：])/.test(line)) break;
+    if (/^(—|-)+\s*(中场休息|Intermission)/i.test(line)) continue;
+    if (line) programLines.push(line);
+  }
+
+  const entries = [];
+  for (let index = 0; index < programLines.length; index += 1) {
+    const line = programLines[index];
+    const next = programLines[index + 1];
+    if (looksLikeComposerLine(line) && next && !looksLikeComposerLine(next)) {
+      const parts = [next];
+      while (programLines[index + 2] && (looksLikeProgramContinuation(programLines[index + 2], parts[parts.length - 1]) || looksLikeProgramContinuationForComposer(line, programLines[index + 2]))) {
+        parts.push(programLines[index + 2]);
+        index += 1;
+      }
+      entries.push({ displayTitle: `${line}：${parts.join(" ")}` });
+      index += 1;
+    } else {
+      entries.push({ displayTitle: line });
+    }
+  }
+
+  return uniqueBy(entries, (item) => item.displayTitle).filter((item) => item.displayTitle !== fallbackTitle).slice(0, 40);
+}
+
+function looksLikeComposerLine(line) {
+  if (/[《》:：]/.test(line)) return false;
+  if (/^(中场休息|Intermission)$/i.test(line)) return false;
+  if (/(交响曲|协奏曲|奏鸣曲|组曲|序曲|作品|小调|大调|major|minor)/i.test(line)) return false;
+  return line.length <= 28;
+}
+
+function looksLikeProgramContinuation(line, previous) {
+  return /^(第[一二三四五六七八九十\d]+|选自|作品|Op\.|Act\b)/i.test(line) || (/选段$/.test(line) && /作品|交响曲|协奏曲|组曲/.test(previous));
+}
+
+function looksLikeProgramContinuationForComposer(composer, line) {
+  return composer.length <= 8 && /^(第[一二三四五六七八九十\d]+|[a-z]\s*小调|[A-G]\s*major|[A-G]\s*minor)/i.test(line);
+}
+
+function introLines(intro) {
+  return String(intro ?? "")
+    .split(/\r?\n/)
+    .map((line) => decodeHtmlEntities(line).replace(/\s+/g, " ").trim())
+    .filter(Boolean);
+}
+
+function htmlToText(value) {
+  const html = String(value ?? "").trim();
+  if (!html) return undefined;
+
+  const normalized = html
+    .replace(/<script[\s\S]*?<\/script>/gi, " ")
+    .replace(/<style[\s\S]*?<\/style>/gi, " ")
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/(p|div|section|article|li|tr|h[1-6])>/gi, "\n")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(/&quot;/gi, "\"")
+    .replace(/&#39;/g, "'")
+    .replace(/[ \t\f\v]+/g, " ")
+    .replace(/\s*\n\s*/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+
+  return decodeHtmlEntities(normalized) || undefined;
+}
+
+function htmlImageUrls(value) {
+  const html = String(value ?? "");
+  return unique([...html.matchAll(/<img[^>]+src=["']?([^"'\s>]+)/gi)].map((match) => decodeHtmlEntities(match[1]).trim()).filter(Boolean));
+}
+
+function decodeHtmlEntities(value) {
+  return String(value ?? "")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(/&quot;/gi, "\"")
+    .replace(/&#39;|&apos;/gi, "'")
+    .replace(/&mdash;/gi, "——")
+    .replace(/&ndash;/gi, "–")
+    .replace(/&middot;/gi, "·")
+    .replace(/&ldquo;|&rdquo;/gi, "\"")
+    .replace(/&lsquo;|&rsquo;/gi, "'")
+    .replace(/&eacute;/gi, "é")
+    .replace(/&egrave;/gi, "è")
+    .replace(/&acirc;/gi, "â")
+    .replace(/&iuml;/gi, "ï")
+    .replace(/&aacute;/gi, "á")
+    .replace(/&agrave;/gi, "à")
+    .replace(/&uuml;/gi, "ü")
+    .replace(/&szlig;/gi, "ß")
+    .replace(/&#(\d+);/g, (_, code) => String.fromCodePoint(Number(code)))
+    .replace(/&#x([0-9a-f]+);/gi, (_, code) => String.fromCodePoint(parseInt(code, 16)));
+}
+
+function unique(values) {
+  return [...new Set(values)];
+}
+
+function uniqueBy(values, key) {
+  const seen = new Set();
+  return values.filter((value) => {
+    const id = key(value);
+    if (seen.has(id)) return false;
+    seen.add(id);
+    return true;
+  });
 }
 
 function toIsoDate(value) {

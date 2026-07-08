@@ -7,6 +7,14 @@ export type MusicPeriod =
   | "现代主义"
   | "当代";
 
+export type SaleState =
+  | "unknown"
+  | "pre_sale"
+  | "on_sale"
+  | "sold_out"
+  | "cancelled"
+  | "ended";
+
 export type Composer = {
   id: string;
   slug: string;
@@ -55,6 +63,7 @@ export type Performance = {
   imageUrl?: string;
   priceLabel?: string;
   saleStatus?: string;
+  saleState?: SaleState;
   address?: string;
   intro?: string;
   isClassical?: boolean;

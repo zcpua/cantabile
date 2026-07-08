@@ -4,6 +4,8 @@ import { createInterface } from "node:readline/promises";
 import { stdin as input, stdout as output } from "node:process";
 import postgres from "postgres";
 import { uploadImageToR2 } from "./lib/r2-upload.mjs";
+import { chncpaSaleState } from "./lib/sale-state.mjs";
+import { logSaleStateTransition, readCurrentSaleState } from "./lib/sale-state-upsert.mjs";
 
 const root = resolve(new URL("..", import.meta.url).pathname);
 loadEnvFiles([".env", ".env.local"]);
@@ -14,7 +16,7 @@ const sourceName = "CHNCPA";
 const classicalKeywords = [
   "交响", "管弦", "室内乐", "钢琴", "小提琴", "中提琴", "大提琴", "低音提琴", "长笛", "单簧管", "双簧管", "小号", "圆号", "歌剧", "芭蕾", "古典", "协奏曲", "奏鸣曲", "四重奏", "三重奏", "合唱", "音乐会", "贝多芬", "莫扎特", "巴赫", "柴科夫斯基", "肖邦", "勃拉姆斯", "马勒", "德彪西", "拉赫玛尼诺夫",
 ];
-const nonClassicalKeywords = ["话剧", "戏剧", "相声", "脱口秀", "儿童剧", "公开排练"];
+const nonClassicalKeywords = ["话剧", "戏剧", "相声", "脱口秀", "儿童剧", "公开排练", "舞剧"];
 
 const args = parseArgs(process.argv.slice(2));
 const knownClassicalTerms = loadKnownClassicalTerms();
@@ -141,6 +143,10 @@ function normalizeProduct(record, detail) {
   const imageUrl = optionalText(record.productImageMax ?? detail?.productImageMax ?? detail?.productImage ?? detail?.imageUrl);
   const priceLabel = priceFromRecord(record, detail);
   const saleStatus = optionalText(record.saleStatusName ?? record.saleStatus ?? record.productStatus ?? detail?.saleStatusName ?? detail?.saleStatus ?? detail?.saleMessage);
+  const saleState = chncpaSaleState(saleStatus);
+  if (saleStatus && saleState === "unknown") {
+    process.stderr.write(`[chncpa] unknown saleStatus mapping: ${JSON.stringify(saleStatus)} (productId=${productId})\n`);
+  }
   const address = optionalText(detail?.venueAddress ?? detail?.address);
   const intro = optionalText(detail?.productIntroduce ?? detail?.introduction ?? detail?.content ?? detail?.description);
   const artists = stringList(detail?.artists ?? detail?.artist ?? detail?.performers ?? detail?.cast);
@@ -163,6 +169,7 @@ function normalizeProduct(record, detail) {
     imageUrl,
     priceLabel,
     saleStatus,
+    saleState,
     address,
     intro,
     isClassical,
@@ -284,48 +291,59 @@ async function promptValue(rl, label, current) {
 }
 
 async function savePerformance(sql, draft, { updateCore }) {
-  const values = performanceValues(sql, draft);
+  const nextState = draft.saleState ?? "unknown";
+  await sql.begin(async (tx) => {
+    const prevState = await readCurrentSaleState(tx, draft.sourceId);
+    const values = performanceValues(tx, draft);
 
-  if (updateCore) {
-    await sql`
-      insert into public.performances ${sql(values, "id", "title", "city", "venue", "starts_at", "artists", "program", "ticket_url", "source_url", "source_name", "image_url", "price_label", "sale_status", "address", "intro", "is_classical", "source_id", "source_metadata")}
-      on conflict (source_id) do update set
-        title = excluded.title,
-        city = excluded.city,
-        venue = excluded.venue,
-        starts_at = excluded.starts_at,
-        artists = excluded.artists,
-        program = excluded.program,
-        ticket_url = excluded.ticket_url,
-        source_url = excluded.source_url,
-        source_name = excluded.source_name,
-        image_url = excluded.image_url,
-        price_label = excluded.price_label,
-        sale_status = excluded.sale_status,
-        address = excluded.address,
-        intro = excluded.intro,
-        is_classical = excluded.is_classical,
-        source_metadata = excluded.source_metadata,
-        updated_at = now()
-    `;
-    return;
-  }
+    let rows;
+    if (updateCore) {
+      rows = await tx`
+        insert into public.performances ${tx(values, "id", "title", "city", "venue", "starts_at", "artists", "program", "ticket_url", "source_url", "source_name", "image_url", "price_label", "sale_status", "sale_state", "address", "intro", "is_classical", "source_id", "source_metadata")}
+        on conflict (source_id) do update set
+          title = excluded.title,
+          city = excluded.city,
+          venue = excluded.venue,
+          starts_at = excluded.starts_at,
+          artists = excluded.artists,
+          program = excluded.program,
+          ticket_url = excluded.ticket_url,
+          source_url = excluded.source_url,
+          source_name = excluded.source_name,
+          image_url = excluded.image_url,
+          price_label = excluded.price_label,
+          sale_status = excluded.sale_status,
+          sale_state = excluded.sale_state,
+          address = excluded.address,
+          intro = excluded.intro,
+          is_classical = excluded.is_classical,
+          source_metadata = excluded.source_metadata,
+          updated_at = now()
+        returning id
+      `;
+    } else {
+      rows = await tx`
+        insert into public.performances ${tx(values, "id", "title", "city", "venue", "starts_at", "artists", "program", "ticket_url", "source_url", "source_name", "image_url", "price_label", "sale_status", "sale_state", "address", "intro", "is_classical", "source_id", "source_metadata")}
+        on conflict (source_id) do update set
+          ticket_url = excluded.ticket_url,
+          source_url = excluded.source_url,
+          source_name = excluded.source_name,
+          image_url = excluded.image_url,
+          price_label = excluded.price_label,
+          sale_status = excluded.sale_status,
+          sale_state = excluded.sale_state,
+          address = excluded.address,
+          intro = excluded.intro,
+          is_classical = excluded.is_classical,
+          source_metadata = excluded.source_metadata,
+          updated_at = now()
+        returning id
+      `;
+    }
 
-  await sql`
-    insert into public.performances ${sql(values, "id", "title", "city", "venue", "starts_at", "artists", "program", "ticket_url", "source_url", "source_name", "image_url", "price_label", "sale_status", "address", "intro", "is_classical", "source_id", "source_metadata")}
-    on conflict (source_id) do update set
-      ticket_url = excluded.ticket_url,
-      source_url = excluded.source_url,
-      source_name = excluded.source_name,
-      image_url = excluded.image_url,
-      price_label = excluded.price_label,
-      sale_status = excluded.sale_status,
-      address = excluded.address,
-      intro = excluded.intro,
-      is_classical = excluded.is_classical,
-      source_metadata = excluded.source_metadata,
-      updated_at = now()
-  `;
+    const id = rows[0]?.id;
+    if (id) await logSaleStateTransition(tx, id, prevState, nextState);
+  });
 }
 
 function performanceValues(sql, draft) {
@@ -343,6 +361,7 @@ function performanceValues(sql, draft) {
     image_url: nullish(draft.imageUrl),
     price_label: nullish(draft.priceLabel),
     sale_status: nullish(draft.saleStatus),
+    sale_state: draft.saleState ?? "unknown",
     address: nullish(draft.address),
     intro: nullish(draft.intro),
     is_classical: draft.isClassical,
