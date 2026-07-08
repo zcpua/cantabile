@@ -40,18 +40,3 @@ export async function logSaleStateTransition(sql, performanceId, prevState, next
   `;
 }
 
-/**
- * Convenience: wrap a scraper's save function with prev-state read + transition
- * write, given a way to locate the row after the upsert (so we get the assigned
- * performance id even on first insert).
- *
- * Not currently used; each scraper inlines the two calls directly to stay
- * closer to its existing structure. Kept exported for future scrapers.
- */
-export async function withTransitionLog(sql, { sourceId, nextState, upsert, findId }) {
-  const prevState = await readCurrentSaleState(sql, sourceId);
-  await upsert();
-  const performanceId = await findId();
-  if (performanceId) await logSaleStateTransition(sql, performanceId, prevState, nextState);
-  return { prevState, nextState };
-}

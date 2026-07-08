@@ -16,7 +16,7 @@ const sourceName = "CHNCPA";
 const classicalKeywords = [
   "交响", "管弦", "室内乐", "钢琴", "小提琴", "中提琴", "大提琴", "低音提琴", "长笛", "单簧管", "双簧管", "小号", "圆号", "歌剧", "芭蕾", "古典", "协奏曲", "奏鸣曲", "四重奏", "三重奏", "合唱", "音乐会", "贝多芬", "莫扎特", "巴赫", "柴科夫斯基", "肖邦", "勃拉姆斯", "马勒", "德彪西", "拉赫玛尼诺夫",
 ];
-const nonClassicalKeywords = ["话剧", "戏剧", "相声", "脱口秀", "儿童剧", "公开排练"];
+const nonClassicalKeywords = ["话剧", "戏剧", "相声", "脱口秀", "儿童剧", "公开排练", "舞剧"];
 
 const args = parseArgs(process.argv.slice(2));
 const knownClassicalTerms = loadKnownClassicalTerms();
