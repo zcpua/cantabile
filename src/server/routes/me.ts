@@ -129,6 +129,7 @@ export const meRoute = new Hono<AppEnv>()
     const performanceId = c.req.param("performanceId");
     const perf = await findPerformanceById(c.get("db"), c.get("dbType"), performanceId);
     if (!perf) return c.json({ error: "performance not found" }, 404);
+    if (!canCreateOnSaleCredit(perf)) return c.json({ error: "performance already on sale or unavailable" }, 400);
     const body = await c.req.json().catch(() => ({}) as Record<string, unknown>);
     const kind = typeof body.kind === "string" && body.kind ? body.kind : "on_sale";
     if (kind !== "on_sale") return c.json({ error: "unsupported kind" }, 400);
@@ -141,6 +142,10 @@ export const meRoute = new Hono<AppEnv>()
     await removeCredit(c.get("db"), c.get("dbType"), c.get("openid"), c.req.param("performanceId"), kind);
     return c.json({ ok: true });
   });
+
+function canCreateOnSaleCredit(perf: { saleState?: string | null }) {
+  return !perf.saleState || perf.saleState === "unknown" || perf.saleState === "pre_sale";
+}
 
 // Parse a `data:image/...;base64,xxx` URL into raw bytes. Caps at ~2MB to
 // reject oversized uploads before they reach object storage.
